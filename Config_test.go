@@ -107,8 +107,8 @@ func TestValidateConfigIfCertSpecifiedKeyIsRequired(t *testing.T) {
 
 func TestValidateConfigWithBothCertAndKeyValidFiles(t *testing.T) {
 	config := &Config{}
-	config.Server.TLS.CertFile = "../LICENSE"
-	config.Server.TLS.KeyFile = "../CONTRIBUTING.md"
+	config.Server.TLS.CertFile = "LICENSE"
+	config.Server.TLS.KeyFile = "CONTRIBUTING.md"
 
 	err := ValidateConfig(config)
 	if err != nil {
