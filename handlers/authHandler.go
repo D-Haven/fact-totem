@@ -27,6 +27,7 @@ import (
 var (
 	JwtSigType jwa.SignatureAlgorithm
 	JwtKey     []byte
+	UserRepo   permissions.UserRepo
 )
 
 type AuthenticatedHandler func(w http.ResponseWriter, r *http.Request, user *permissions.User)
@@ -44,7 +45,7 @@ func AuthHandler(authHandler AuthenticatedHandler) http.Handler {
 				return
 			}
 
-			user = permissions.Repo.FindUser(token.Subject())
+			user = UserRepo.FindUser(token.Subject())
 		}
 
 		authHandler(w, r, user)

@@ -17,8 +17,9 @@
 
 package permissions
 
-var (
-	Repo UserRepo = &Repository{}
+import (
+	"gopkg.in/yaml.v3"
+	"io"
 )
 
 type UserRepo interface {
@@ -40,4 +41,9 @@ func (r *Repository) FindUser(subject string) *User {
 	return &User{
 		Subject: subject,
 	}
+}
+
+func (r *Repository) LoadPermissions(config io.Reader) error {
+	decoder := yaml.NewDecoder(config)
+	return decoder.Decode(&r.Users)
 }

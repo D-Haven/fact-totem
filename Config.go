@@ -29,6 +29,8 @@ type Config struct {
 	JwtKeyPath string `yaml:"jwtKeyPath"`
 	// Project Db path
 	ProjectDb string `yaml:"project-db"`
+	// User Permissions path
+	PermissionsPath string `yaml:"permissions-path"`
 
 	Server struct {
 		// Host is the server host name

@@ -18,16 +18,15 @@ package main
 
 import (
 	"github.com/D-Haven/fact-totem/handlers"
+	"github.com/D-Haven/fact-totem/permissions"
 	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
 	"log"
 	"math/rand"
 	"os"
 )
 
 func ConfigureJwt(config *Config) {
-	jwt.RegisterCustomField("rol", []string{})
-	jwt.RegisterCustomField("ver", "")
+	// Need to make this k8s service account compliant
 	handlers.JwtSigType = jwa.HS512
 
 	content, err := os.ReadFile(config.JwtKeyPath)
@@ -43,4 +42,22 @@ func ConfigureJwt(config *Config) {
 	}
 
 	handlers.JwtKey = content
+
+	repo := permissions.Repository{}
+	file, err := os.Open(config.PermissionsPath)
+	if err != nil {
+		log.Panicf("Could not open the permissions file: %s", err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing config file: %s", err)
+		}
+	}()
+
+	err = repo.LoadPermissions(file)
+	if err != nil {
+		log.Panicf("Could not read the permissions file: %s", err)
+	}
+
+	handlers.UserRepo = &repo
 }
