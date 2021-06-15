@@ -29,53 +29,22 @@ var (
 	JwtKey     []byte
 )
 
-type AuthenticatedHandler func(w http.ResponseWriter, r *http.Request, user *Token)
-
-type Token struct {
-	Version string   `json:"ver"`
-	Subject string   `json:"sub"`
-	Roles   []string `json:"rol"`
-}
-
-func (t *Token) User() *permissions.User {
-	return &permissions.User{
-		Subject: t.Subject,
-		Roles:   t.Roles,
-	}
-}
+type AuthenticatedHandler func(w http.ResponseWriter, r *http.Request, user *permissions.User)
 
 func AuthHandler(authHandler AuthenticatedHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, _ := jwt.ParseRequest(r, jwt.WithVerify(JwtSigType, JwtKey))
-		var user *Token
+		var user *permissions.User
 
 		if token != nil {
 			err := jwt.Validate(token,
-				jwt.WithAudience("pmbob"),
-				jwt.WithIssuer("hrbob"),
 				jwt.WithAcceptableSkew(2*time.Second))
 			if err != nil {
 				createError(permissions.NotAuthorized{Cause: err}).write(w)
 				return
 			}
 
-			/*
-				iat, iatOk := token.Get("iat")
-				exp, expOk := token.Get("exp")
-
-				if !iatOk || !expOk || exp.(time.Time).Sub(iat.(time.Time)) > 10*time.Minute {
-					createError(NotAuthorized{
-						Cause: errors.New("invalid token spec"),
-					}).write(w)
-					return
-				}
-			*/
-
-			user = &Token{
-				Subject: token.Subject(),
-				Version: token.PrivateClaims()["ver"].(string),
-				Roles:   token.PrivateClaims()["rol"].([]string),
-			}
+			user = permissions.Repo.FindUser(token.Subject())
 		}
 
 		authHandler(w, r, user)

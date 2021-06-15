@@ -17,40 +17,27 @@
 
 package permissions
 
-import "strings"
-
-const (
-	Read   = "read"
-	Append = "append"
-	Scan   = "scan"
+var (
+	Repo UserRepo = &Repository{}
 )
 
-type User struct {
-	Subject string
-	Read    []string
-	Append  []string
-	Scan    []string
+type UserRepo interface {
+	FindUser(subject string) *User
 }
 
-func (u User) CheckPermission(permission string, aggregate string) error {
-	switch strings.ToLower(permission) {
-	case Read:
-		return checkAggregates(aggregate, u.Read)
-	case Append:
-		return checkAggregates(aggregate, u.Append)
-	case Scan:
-		return checkAggregates(aggregate, u.Scan)
-	}
-
-	return NotAuthorized{}
+type Repository struct {
+	Users []User
 }
 
-func checkAggregates(aggregate string, allowedList []string) error {
-	for _, a := range allowedList {
-		if a == aggregate {
-			return nil
+func (r *Repository) FindUser(subject string) *User {
+	for _, u := range r.Users {
+		if u.Subject == subject {
+			return &u
 		}
 	}
 
-	return NotAuthorized{}
+	// Empty permission set for this user
+	return &User{
+		Subject: subject,
+	}
 }
