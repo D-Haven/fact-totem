@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// Package eventstore handles the low level badger interactions.
 package eventstore
 
 // EventStore provides an interface to store events for a topic, and retrieve them later.
