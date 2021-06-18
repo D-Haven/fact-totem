@@ -23,7 +23,9 @@ import (
 	"github.com/D-Haven/fact-totem/eventstore"
 	"github.com/D-Haven/fact-totem/permissions"
 	"net/http"
+	"os"
 	"regexp"
+	"time"
 )
 
 type Call struct {
@@ -35,9 +37,20 @@ type FactApi struct {
 	EventStore eventstore.EventStore
 }
 
-func NewApi(path string) (*FactApi, error) {
+func NewApi(path string, keyfile string, keyDuration time.Duration) (*FactApi, error) {
 	api := FactApi{}
-	api.EventStore = eventstore.FileStore(path)
+
+	if len(keyfile) > 0 {
+		key, err := os.ReadFile(keyfile)
+		if err != nil {
+			return nil, err
+		}
+
+		api.EventStore = eventstore.EncryptedFileStore(path, key, keyDuration)
+	} else {
+		api.EventStore = eventstore.FileStore(path)
+	}
+
 	api.EventStore.Register(map[string]interface{}{})
 	api.EventStore.Register([]interface{}{})
 

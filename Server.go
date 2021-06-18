@@ -64,7 +64,7 @@ func main() {
 	multiplexHandler.Handle("/ready", health)
 	multiplexHandler.Handle("/live", health)
 
-	projectApi, err := handlers.NewApi(config.ProjectDb)
+	projectApi, err := handlers.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
