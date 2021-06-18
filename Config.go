@@ -60,13 +60,13 @@ type Config struct {
 func GetValidatedConfig(configPath string) (*Config, error) {
 	var config *Config
 	file, err := os.Open(configPath)
-	defer func() {
-		if err := file.Close(); err != nil {
-			log.Printf("Error closing config file: %s", err)
-		}
-	}()
-
 	if err == nil {
+		defer func() {
+			if err := file.Close(); err != nil {
+				log.Printf("Error closing config file: %s", err)
+			}
+		}()
+
 		config, err = ReadConfig(file)
 	}
 
