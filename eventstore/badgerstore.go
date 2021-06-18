@@ -44,6 +44,11 @@ type Record struct {
 	Content   interface{}
 }
 
+type AggregateStats struct {
+	LastId ulid.ULID
+	Total  uint
+}
+
 func MemoryStore() EventStore {
 	return &BadgerEventStore{
 		MemoryOnly: true,
@@ -92,7 +97,7 @@ func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
 	return b.db, nil
 }
 
-func (b *BadgerEventStore) Append(aggregate string, key string, content interface{}) (string, error) {
+func (b *BadgerEventStore) Append(aggregate string, key string, content interface{}) (*Record, uint, error) {
 	now := time.Now().UTC()
 
 	record := Record{
@@ -106,26 +111,60 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 
 	k, err := record.Id.MarshalText()
 	if err != nil {
-		return "", err
+		return nil, 0, err
 	}
 
+	aggKey := []byte(strings.Join([]string{aggregate, key}, separator))
 	evtKey := []byte(strings.Join([]string{aggregate, key, string(k)}, separator))
 	err = enc.Encode(record)
 	if err != nil {
-		return "", err
+		return nil, 0, err
 	}
 
 	value := c.Bytes()
 
 	db, err := b.kvStore()
 	if err != nil {
-		return "", err
+		return nil, 0, err
 	}
 
+	var total uint
+
 	if err = db.Update(func(txn *badger.Txn) error {
-		return txn.Set(evtKey, value)
+		stats := AggregateStats{}
+		item, err := txn.Get(aggKey)
+		if err == nil {
+			// If there is an error then this is a virgin aggregate so there is nothing to read
+			err = item.Value(func(val []byte) error {
+				dec := gob.NewDecoder(bytes.NewBuffer(val))
+				return dec.Decode(&stats)
+			})
+
+			if err != nil {
+				return err
+			}
+		}
+
+		err = txn.Set(evtKey, value)
+		if err != nil {
+			return err
+		}
+
+		stats.LastId = record.Id
+		stats.Total += 1
+		total = stats.Total
+
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+		err = enc.Encode(&stats)
+
+		if err != nil {
+			return err
+		}
+
+		return txn.Set(aggKey, buf.Bytes())
 	}); err != nil {
-		return "", err
+		return nil, 0, err
 	}
 
 	if runtime.GOOS == "windows" {
@@ -133,7 +172,7 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	return string(k), nil
+	return &record, total, nil
 }
 
 func (b *BadgerEventStore) Register(t interface{}) {

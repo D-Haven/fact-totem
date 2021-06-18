@@ -17,6 +17,7 @@
 package main
 
 import (
+	"github.com/D-Haven/fact-totem/handlers"
 	"github.com/D-Haven/fact-totem/version"
 	"github.com/heptiolabs/healthcheck"
 	"golang.org/x/net/context"
@@ -27,7 +28,7 @@ import (
 	"syscall"
 )
 
-const appName = "PM Bob"
+const appName = "Fact-Totem"
 
 func main() {
 	err := ShowLogo(log.Writer())
@@ -63,9 +64,12 @@ func main() {
 	multiplexHandler.Handle("/ready", health)
 	multiplexHandler.Handle("/live", health)
 
-	//projectApi := handlers.NewApi(config.ProjectDb, nil, 0)
-	//authHandler := handlers.AuthHandler(projectApi.Handle)
-	//multiplexHandler.Handle("/", authHandler)
+	projectApi, err := handlers.NewApi(config.ProjectDb)
+	if err != nil {
+		log.Fatal(err)
+	}
+	authHandler := handlers.AuthHandler(projectApi.Handle)
+	multiplexHandler.Handle("/", authHandler)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

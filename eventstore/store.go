@@ -22,7 +22,7 @@ type EventStore interface {
 	// Register a type for (de)serialization, needed to store and reconstitute objects
 	Register(t interface{})
 	// Append append an event to the event store for the fact
-	Append(aggregate string, key string, content interface{}) (string, error)
+	Append(aggregate string, key string, content interface{}) (*Record, uint, error)
 	// Tail gets the last event id
 	Tail(aggregate string, key string) (string, error)
 	// Read the events for an aggregate from the beginning

@@ -35,10 +35,10 @@ func ConfigureJwt(config *Config) {
 		rand.Read(content)
 		err := os.WriteFile(config.JwtKeyPath, content, 0640)
 		if err != nil {
-			log.Panicf("Could not create key jwt key file: %s", err)
+			log.Fatalf("Could not create key jwt key file: %s", err)
 		}
 	} else if err != nil {
-		log.Panicf("Unexpected error reading the key: %s", err)
+		log.Fatalf("Unexpected error reading the key: %s", err)
 	}
 
 	handlers.JwtKey = content
@@ -46,17 +46,17 @@ func ConfigureJwt(config *Config) {
 	repo := permissions.Repository{}
 	file, err := os.Open(config.PermissionsPath)
 	if err != nil {
-		log.Panicf("Could not open the permissions file: %s", err)
+		log.Fatalf("Could not open the permissions file: %s", err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Printf("Error closing config file: %s", err)
+			log.Fatalf("Error closing config file: %s", err)
 		}
 	}()
 
 	err = repo.LoadPermissions(file)
 	if err != nil {
-		log.Panicf("Could not read the permissions file: %s", err)
+		log.Fatalf("Could not read the permissions file: %s", err)
 	}
 
 	handlers.UserRepo = &repo

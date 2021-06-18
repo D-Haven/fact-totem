@@ -67,6 +67,7 @@ func GetValidatedConfig(configPath string) (*Config, error) {
 		config.Server.Port = "8080"
 		config.JwtKeyPath = "./jwt.key"
 		config.ProjectDb = "./tmp/project"
+		config.PermissionsPath = "./permissions.yaml"
 	}
 
 	err = ValidateConfig(config)

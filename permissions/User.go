@@ -20,9 +20,10 @@ package permissions
 import "strings"
 
 const (
-	Read   = "read"
-	Append = "append"
-	Scan   = "scan"
+	Read     = "read"
+	Append   = "append"
+	Scan     = "scan"
+	Wildcard = "*"
 )
 
 type User struct {
@@ -46,8 +47,12 @@ func (u User) CheckPermission(permission string, aggregate string) error {
 }
 
 func checkAggregates(aggregate string, allowedList []string) error {
+	if len(aggregate) == 0 {
+		return NotAuthorized{}
+	}
+
 	for _, a := range allowedList {
-		if a == aggregate {
+		if a == aggregate || a == Wildcard {
 			return nil
 		}
 	}
