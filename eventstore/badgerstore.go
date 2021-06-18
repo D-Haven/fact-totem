@@ -39,7 +39,7 @@ type BadgerEventStore struct {
 	db                         *badger.DB
 }
 
-type Record struct {
+type Fact struct {
 	Id        ulid.ULID
 	Timestamp time.Time
 	Content   interface{}
@@ -88,7 +88,7 @@ func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
 		opts = opts.WithIndexCacheSize(100 << 20) // 100 mb
 	}
 
-	b.Register(Record{})
+	b.Register(Fact{})
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 	now := time.Now().UTC()
 
 	tail := Tail{
-		Record: Record{
+		Fact: Fact{
 			Id:        NewId(now),
 			Timestamp: now,
 			Content:   content,
@@ -116,14 +116,14 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 	var c bytes.Buffer
 	enc := gob.NewEncoder(&c)
 
-	k, err := tail.Record.Id.MarshalText()
+	k, err := tail.Fact.Id.MarshalText()
 	if err != nil {
 		return nil, err
 	}
 
 	aggKey := []byte(strings.Join([]string{aggregate, entity}, separator))
-	evtKey := []byte(strings.Join([]string{aggregate, entity, string(k)}, separator))
-	err = enc.Encode(tail.Record)
+	factKey := []byte(strings.Join([]string{aggregate, entity, string(k)}, separator))
+	err = enc.Encode(tail.Fact)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +150,12 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 			}
 		}
 
-		err = txn.Set(evtKey, value)
+		err = txn.Set(factKey, value)
 		if err != nil {
 			return err
 		}
 
-		stats.LastId = tail.Record.Id
+		stats.LastId = tail.Fact.Id
 		stats.Total += 1
 		tail.Total = stats.Total
 
@@ -180,7 +180,7 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 	return &tail, nil
 }
 
-func (b *BadgerEventStore) Read(aggregate string, entity string, evtId string, maxCount int) (*RecordList, error) {
+func (b *BadgerEventStore) Read(aggregate string, entity string, factId string, maxCount int) (*RecordList, error) {
 	db, err := b.kvStore()
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, evtId string, m
 	}
 
 	aggKey := []byte(strings.Join([]string{aggregate, entity}, separator))
-	evtKey := []byte(strings.Join([]string{aggregate, entity, evtId}, separator))
+	factKey := []byte(strings.Join([]string{aggregate, entity, factId}, separator))
 
 	if err = db.View(func(txn *badger.Txn) error {
 		stats := AggregateStats{}
@@ -221,19 +221,19 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, evtId string, m
 		defer it.Close()
 
 		// Walk all the events using the aggregate as a prefix
-		for it.Seek(evtKey); len(records.List) < records.PageSize && it.ValidForPrefix(aggKey); it.Next() {
+		for it.Seek(factKey); len(records.List) < records.PageSize && it.ValidForPrefix(aggKey); it.Next() {
 			item := it.Item()
 
 			err := item.Value(func(val []byte) error {
 				c := bytes.NewBuffer(val)
 				dec := gob.NewDecoder(c)
-				var record Record
+				var record Fact
 				if err = dec.Decode(&record); err != nil {
 					return err
 				}
 
 				recordId, _ := record.Id.MarshalText()
-				if string(recordId) <= evtId {
+				if string(recordId) <= factId {
 					return nil
 				}
 
@@ -292,7 +292,7 @@ func (b *BadgerEventStore) Tail(aggregate string, entitty string) (*Tail, error)
 		err = item.Value(func(val []byte) error {
 			c := bytes.NewBuffer(val)
 			dec := gob.NewDecoder(c)
-			return dec.Decode(&tail.Record)
+			return dec.Decode(&tail.Fact)
 		})
 
 		return err

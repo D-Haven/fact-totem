@@ -29,18 +29,18 @@ type Request struct {
 }
 
 type TailResponse struct {
-	Aggregate string            `json:"aggregate"`
-	Entity    string            `json:"entity,omitempty"`
-	Data      eventstore.Record `json:"data"`
-	Total     uint              `json:"total"`
+	Aggregate string          `json:"aggregate"`
+	Entity    string          `json:"entity,omitempty"`
+	Fact      eventstore.Fact `json:"fact"`
+	Total     uint            `json:"total"`
 }
 
 type ReadResponse struct {
-	Aggregate string              `json:"aggregate"`
-	Entity    string              `json:"entity"`
-	Data      []eventstore.Record `json:"data"`
-	Total     uint                `json:"total"`
-	PageSize  int                 `json:"page-size"`
+	Aggregate string            `json:"aggregate"`
+	Entity    string            `json:"entity"`
+	Facts     []eventstore.Fact `json:"facts"`
+	Total     uint              `json:"total"`
+	PageSize  int               `json:"page-size"`
 }
 
 type ScanResponse struct {

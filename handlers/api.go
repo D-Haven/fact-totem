@@ -144,7 +144,7 @@ func (api *FactApi) Append(user *permissions.User, agg string, key string, conte
 	resp := TailResponse{
 		Aggregate: agg,
 		Entity:    key,
-		Data:      tail.Record,
+		Fact:      tail.Fact,
 		Total:     tail.Total,
 	}
 	return &resp, nil
@@ -170,7 +170,7 @@ func (api *FactApi) Read(user *permissions.User, aggregate string, key string, o
 	resp := ReadResponse{
 		Aggregate: aggregate,
 		Entity:    key,
-		Data:      records.List,
+		Facts:     records.List,
 		Total:     records.Total,
 		PageSize:  records.PageSize,
 	}
@@ -198,7 +198,7 @@ func (api *FactApi) Tail(user *permissions.User, aggregate string, key string) (
 	resp := TailResponse{
 		Aggregate: aggregate,
 		Entity:    key,
-		Data:      tail.Record,
+		Fact:      tail.Fact,
 		Total:     tail.Total,
 	}
 	return &resp, nil

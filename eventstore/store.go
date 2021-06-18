@@ -18,12 +18,12 @@
 package eventstore
 
 type Tail struct {
-	Record Record
-	Total  uint
+	Fact  Fact
+	Total uint
 }
 
 type RecordList struct {
-	List     []Record
+	List     []Fact
 	Total    uint
 	PageSize int
 }
