@@ -18,4 +18,5 @@
 # vendor/
 /permissions.yaml
 /jwt.key
+*.txt
 tmp/

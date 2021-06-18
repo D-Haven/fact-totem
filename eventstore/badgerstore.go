@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	separator = "|"
+	separator   = "|"
+	maxPageSize = 10000
 )
 
 type BadgerEventStore struct {
@@ -97,38 +98,42 @@ func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
 	return b.db, nil
 }
 
-func (b *BadgerEventStore) Append(aggregate string, key string, content interface{}) (*Record, uint, error) {
+func (b *BadgerEventStore) Register(t interface{}) {
+	gob.Register(t)
+}
+
+func (b *BadgerEventStore) Append(aggregate string, key string, content interface{}) (*Tail, error) {
 	now := time.Now().UTC()
 
-	record := Record{
-		Id:        NewId(now),
-		Timestamp: now,
-		Content:   content,
+	tail := Tail{
+		Record: Record{
+			Id:        NewId(now),
+			Timestamp: now,
+			Content:   content,
+		},
 	}
 
 	var c bytes.Buffer
 	enc := gob.NewEncoder(&c)
 
-	k, err := record.Id.MarshalText()
+	k, err := tail.Record.Id.MarshalText()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	aggKey := []byte(strings.Join([]string{aggregate, key}, separator))
 	evtKey := []byte(strings.Join([]string{aggregate, key, string(k)}, separator))
-	err = enc.Encode(record)
+	err = enc.Encode(tail.Record)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	value := c.Bytes()
 
 	db, err := b.kvStore()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-
-	var total uint
 
 	if err = db.Update(func(txn *badger.Txn) error {
 		stats := AggregateStats{}
@@ -150,9 +155,9 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 			return err
 		}
 
-		stats.LastId = record.Id
+		stats.LastId = tail.Record.Id
 		stats.Total += 1
-		total = stats.Total
+		tail.Total = stats.Total
 
 		var buf bytes.Buffer
 		enc := gob.NewEncoder(&buf)
@@ -164,7 +169,7 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 
 		return txn.Set(aggKey, buf.Bytes())
 	}); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	if runtime.GOOS == "windows" {
@@ -172,36 +177,51 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	return &record, total, nil
+	return &tail, nil
 }
 
-func (b *BadgerEventStore) Register(t interface{}) {
-	gob.Register(t)
-}
-
-func (b *BadgerEventStore) Read(aggregate string, key string) ([]interface{}, string, error) {
-	return b.ReadFrom(aggregate, key, "")
-}
-
-func (b *BadgerEventStore) ReadFrom(aggregate string, key string, evtId string) ([]interface{}, string, error) {
+func (b *BadgerEventStore) Read(aggregate string, key string, evtId string, maxCount int) (*RecordList, error) {
 	db, err := b.kvStore()
-
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	prefix := []byte(strings.Join([]string{aggregate, key}, separator))
-	var values []interface{}
-	var lastEvt string
+	var records = RecordList{
+		PageSize: maxCount,
+	}
+
+	if records.PageSize < 1 || records.PageSize > maxPageSize {
+		records.PageSize = maxPageSize
+	}
+
+	aggKey := []byte(strings.Join([]string{aggregate, key}, separator))
+	evtKey := []byte(strings.Join([]string{aggregate, key, evtId}, separator))
 
 	if err = db.View(func(txn *badger.Txn) error {
+		stats := AggregateStats{}
+		item, err := txn.Get(aggKey)
+		if err != nil {
+			return err
+		}
+
+		// If there is an error then this is a virgin aggregate so there is nothing to read
+		err = item.Value(func(val []byte) error {
+			dec := gob.NewDecoder(bytes.NewBuffer(val))
+			return dec.Decode(&stats)
+		})
+		if err != nil {
+			return err
+		}
+
+		records.Total = stats.Total
+
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchSize = 10
 		it := txn.NewIterator(opts)
 		defer it.Close()
 
 		// Walk all the events using the aggregate as a prefix
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		for it.Seek(evtKey); len(records.List) < records.PageSize && it.ValidForPrefix(aggKey); it.Next() {
 			item := it.Item()
 
 			err := item.Value(func(val []byte) error {
@@ -217,8 +237,7 @@ func (b *BadgerEventStore) ReadFrom(aggregate string, key string, evtId string) 
 					return nil
 				}
 
-				lastEvt = string(recordId)
-				values = append(values, record.Content)
+				records.List = append(records.List, record)
 				return nil
 			})
 
@@ -228,41 +247,61 @@ func (b *BadgerEventStore) ReadFrom(aggregate string, key string, evtId string) 
 		}
 		return nil
 	}); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	return values, lastEvt, nil
+	return &records, nil
 }
 
-func (b *BadgerEventStore) Tail(aggregate string, key string) (string, error) {
+func (b *BadgerEventStore) Tail(aggregate string, key string) (*Tail, error) {
 	db, err := b.kvStore()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var lastKey string
-	prefix := strings.Join([]string{aggregate, key}, separator)
+	tail := Tail{}
+	aggKey := strings.Join([]string{aggregate, key}, separator)
 	err = db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false // keys only
-		opts.Reverse = true
-
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		p := []byte(prefix)
-
-		it.Seek(append(p, 0xff))
-		if it.ValidForPrefix(p) {
-			key := string(it.Item().Key())
-			split := strings.Split(key, separator)
-			lastKey = split[len(split)-1]
+		stats := AggregateStats{}
+		item, err := txn.Get([]byte(aggKey))
+		if err != nil {
+			return err
 		}
 
-		return nil
-	})
+		// If there is an error then this is a virgin aggregate so there is nothing to read
+		err = item.Value(func(val []byte) error {
+			dec := gob.NewDecoder(bytes.NewBuffer(val))
+			return dec.Decode(&stats)
+		})
+		if err != nil {
+			return err
+		}
 
-	return lastKey, err
+		tail.Total = stats.Total
+		k, err := stats.LastId.MarshalText()
+		if err != nil {
+			return err
+		}
+
+		evtKey := []byte(strings.Join([]string{aggregate, key, string(k)}, separator))
+		item, err = txn.Get(evtKey)
+		if err != nil {
+			return err
+		}
+
+		err = item.Value(func(val []byte) error {
+			c := bytes.NewBuffer(val)
+			dec := gob.NewDecoder(c)
+			return dec.Decode(&tail.Record)
+		})
+
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &tail, nil
 }
 
 func (b *BadgerEventStore) ListKeysForAggregate(aggregate string) ([]string, error) {

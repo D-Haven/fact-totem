@@ -17,18 +17,33 @@
 // Package eventstore handles the low level badger interactions.
 package eventstore
 
+type Tail struct {
+	Record Record
+	Total  uint
+}
+
+type RecordList struct {
+	List     []Record
+	Total    uint
+	PageSize int
+}
+
+type KeyList struct {
+	List     []string
+	Total    uint
+	PageSize int
+}
+
 // EventStore provides an interface to store events for a topic, and retrieve them later.
 type EventStore interface {
 	// Register a type for (de)serialization, needed to store and reconstitute objects
 	Register(t interface{})
 	// Append append an event to the event store for the fact
-	Append(aggregate string, key string, content interface{}) (*Record, uint, error)
+	Append(aggregate string, key string, content interface{}) (*Tail, error)
 	// Tail gets the last event id
-	Tail(aggregate string, key string) (string, error)
-	// Read the events for an aggregate from the beginning
-	Read(aggregate string, key string) ([]interface{}, string, error)
-	// ReadFrom the events for an aggregate from the identified event id
-	ReadFrom(aggregate string, key string, eventId string) ([]interface{}, string, error)
+	Tail(aggregate string, key string) (*Tail, error)
+	// Read the events for an aggregate from the identified event id
+	Read(aggregate string, key string, originEventId string, maxCount int) (*RecordList, error)
 	// ListKeysForAggregate will list all keys with the aggregate prefix
 	ListKeysForAggregate(aggregate string) ([]string, error)
 	// Close the event store

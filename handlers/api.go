@@ -109,7 +109,7 @@ func (api *FactApi) Handle(w http.ResponseWriter, r *http.Request, user *permiss
 }
 
 func (api *FactApi) Append(user *permissions.User, agg string, key string, content interface{}) (*TailResponse, error) {
-	err := user.CheckPermission(Append.String(), agg)
+	err := user.CheckPermission(permissions.Append, agg)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (api *FactApi) Append(user *permissions.User, agg string, key string, conte
 		return nil, BadRequest{Element: "content"}
 	}
 
-	record, total, err := api.EventStore.Append(agg, key, content)
+	tail, err := api.EventStore.Append(agg, key, content)
 	if err != nil {
 		return nil, err
 	}
@@ -131,22 +131,73 @@ func (api *FactApi) Append(user *permissions.User, agg string, key string, conte
 	resp := TailResponse{
 		Aggregate: agg,
 		Key:       key,
-		Data:      *record,
-		Total:     total,
+		Data:      tail.Record,
+		Total:     tail.Total,
 	}
 	return &resp, nil
 }
 
 func (api *FactApi) Read(user *permissions.User, aggregate string, key string, origin string, size int) (*ReadResponse, error) {
-	panic("not implemented")
+	err := user.CheckPermission(permissions.Read, aggregate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Aggregate is handled by user permissions (empty aggregate is always denied)
+
+	if len(key) == 0 {
+		return nil, BadRequest{Element: "key"}
+	}
+
+	records, err := api.EventStore.Read(aggregate, key, origin, size)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ReadResponse{
+		Aggregate: aggregate,
+		Key:       key,
+		Data:      records.List,
+		Total:     records.Total,
+		PageSize:  records.PageSize,
+	}
+
+	return &resp, nil
 }
 
 func (api *FactApi) Tail(user *permissions.User, aggregate string, key string) (*TailResponse, error) {
-	panic("not implemented")
+	err := user.CheckPermission(permissions.Read, aggregate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Aggregate is handled by user permissions (empty aggregate is always denied)
+
+	if len(key) == 0 {
+		return nil, BadRequest{Element: "key"}
+	}
+
+	tail, err := api.EventStore.Tail(aggregate, key)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := TailResponse{
+		Aggregate: aggregate,
+		Key:       key,
+		Data:      tail.Record,
+		Total:     tail.Total,
+	}
+	return &resp, nil
 }
 
 func (api *FactApi) Scan(user *permissions.User, aggregate string, pageSize int) (*ScanResponse, error) {
-	panic("not implemented")
+	err := user.CheckPermission(permissions.Scan, aggregate)
+	if err != nil {
+		return nil, err
+	}
+
+	panic("Scan not implemented")
 }
 
 func send(w http.ResponseWriter, httpStatus int, object interface{}) {
