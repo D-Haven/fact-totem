@@ -35,7 +35,8 @@ type Config struct {
 	EventStore struct {
 		// Path to the database files
 		Path string `yaml:"path"`
-		// EncryptionKey file to turn on encryption at rest
+		// EncryptionKey file to turn on encryption at rest.
+		// See https://dgraph.io/blog/post/encryption-at-rest-dgraph-badger/
 		EncryptionKey string `yaml:"encryption-key"`
 		// KeyDuration automatic key rotation schedule, defaults to 10 days
 		KeyDuration time.Duration `yaml:"key-duration"`
