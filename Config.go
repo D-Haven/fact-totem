@@ -22,16 +22,26 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
+	"time"
 )
 
 type Config struct {
-	// JWT Key path
+	// JWT Entity path
 	JwtKeyPath string `yaml:"jwtKeyPath"`
-	// Project Db path
-	ProjectDb string `yaml:"project-db"`
 	// User Permissions path
 	PermissionsPath string `yaml:"permissions-path"`
-
+	// Badger DB settings
+	EventStore struct {
+		// Path to the database files
+		Path string `yaml:"path"`
+		// EncryptionKey file to turn on encryption at rest.
+		// See https://dgraph.io/blog/post/encryption-at-rest-dgraph-badger/
+		EncryptionKey string `yaml:"encryption-key"`
+		// KeyDuration automatic key rotation schedule, defaults to 10 days
+		KeyDuration time.Duration `yaml:"key-duration"`
+	} `yaml:"event-store"`
+	// Server settings
 	Server struct {
 		// Host is the server host name
 		Host string `yaml:"host"`
@@ -66,7 +76,9 @@ func GetValidatedConfig(configPath string) (*Config, error) {
 
 		config.Server.Port = "8080"
 		config.JwtKeyPath = "./jwt.key"
-		config.ProjectDb = "./tmp/project"
+		config.PermissionsPath = "./permissions.yaml"
+		config.EventStore.Path = path.Join(".", "tmp", appName)
+		config.EventStore.KeyDuration = time.Hour * 24 * 10
 	}
 
 	err = ValidateConfig(config)
@@ -101,7 +113,7 @@ func ValidateConfig(config *Config) error {
 	}
 
 	if tlsKeySpecified && !tlsCertSpecified {
-		return fmt.Errorf("TLS Key specified, but no certificate was provided")
+		return fmt.Errorf("TLS Entity specified, but no certificate was provided")
 	}
 
 	if err := ValidateOptionalFile(config.Server.TLS.KeyFile); err != nil {

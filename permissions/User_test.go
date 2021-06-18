@@ -19,6 +19,48 @@ package permissions
 
 import "testing"
 
+func TestUser_CheckPermission_AllowWildcard(t *testing.T) {
+	u := User{
+		Subject: "test",
+		Read:    []string{"*"},
+		Append:  []string{"*"},
+		Scan:    []string{"*"},
+	}
+
+	if err := u.CheckPermission(Read, "foo"); err != nil {
+		t.Errorf("Expected permitted but was %s", err)
+	}
+
+	if err := u.CheckPermission(Append, "bar"); err != nil {
+		t.Errorf("Expected permitted but was %s", err)
+	}
+
+	if err := u.CheckPermission(Scan, "baz"); err != nil {
+		t.Errorf("Expected permitted but was %s", err)
+	}
+}
+
+func TestUser_CheckPermission_NeverAllowEmptyAggregate(t *testing.T) {
+	u := User{
+		Subject: "test",
+		Read:    []string{""},
+		Append:  []string{""},
+		Scan:    []string{""},
+	}
+
+	if u.CheckPermission(Read, "") == nil {
+		t.Errorf("Expected NotAuthorized but was allowed")
+	}
+
+	if u.CheckPermission(Append, "") == nil {
+		t.Errorf("Expected NotAuthorized but was allowed")
+	}
+
+	if u.CheckPermission(Scan, "") == nil {
+		t.Errorf("Expected NotAuthorized but was allowed")
+	}
+}
+
 func TestUser_CheckPermission_CanRead(t *testing.T) {
 	u := User{
 		Subject: "foo",

@@ -32,8 +32,10 @@ type Repository struct {
 
 func (r *Repository) FindUser(subject string) *User {
 	for _, u := range r.Users {
-		if u.Subject == subject {
-			return &u
+		if u.Subject == subject || u.Subject == Wildcard {
+			userCopy := u
+			userCopy.Subject = subject
+			return &userCopy
 		}
 	}
 

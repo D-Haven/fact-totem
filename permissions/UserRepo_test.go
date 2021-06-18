@@ -47,3 +47,33 @@ func TestRepository_LoadPermissions(t *testing.T) {
 		t.Error("Expected to be able to read the repository aggregate")
 	}
 }
+
+func TestRepository_LoadPermissions_wideOpen(t *testing.T) {
+	repo := Repository{}
+
+	const userStream = `
+    - subject: "*"
+      read: ["*"]
+      append: ["*"]
+      scan: ["*"]`
+
+	err := repo.LoadPermissions(strings.NewReader(userStream))
+	if err != nil {
+		t.Error(err)
+	}
+
+	u := repo.FindUser("system:serviceaccount:cibob-dev:cmbob")
+
+	if u.CheckPermission(Append, "project") != nil {
+		t.Error("Expected to be able to append to the project aggregate")
+	}
+	if u.CheckPermission(Read, "project") != nil {
+		t.Error("Expected to be able to read the project aggregate")
+	}
+	if u.CheckPermission(Read, "repository") != nil {
+		t.Error("Expected to be able to read the repository aggregate")
+	}
+	if u.CheckPermission(Scan, "project") != nil {
+		t.Error("Expected to be able to scan the project aggregate")
+	}
+}
