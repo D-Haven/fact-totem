@@ -68,6 +68,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		err := projectApi.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	authHandler := handlers.AuthHandler(projectApi.Handle)
 	multiplexHandler.Handle("/", authHandler)
 

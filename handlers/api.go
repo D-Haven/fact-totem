@@ -57,6 +57,10 @@ func NewApi(path string, keyfile string, keyDuration time.Duration) (*FactApi, e
 	return &api, nil
 }
 
+func (api *FactApi) Close() error {
+	return api.EventStore.Close()
+}
+
 func (api *FactApi) Handle(w http.ResponseWriter, r *http.Request, user *permissions.User) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Allow", "OPTIONS, POST")
