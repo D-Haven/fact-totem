@@ -77,7 +77,7 @@ func (api *FactApi) Handle(w http.ResponseWriter, r *http.Request, user *permiss
 
 	switch req.Action {
 	case Append:
-		tail, err := api.Append(user, req.Aggregate, req.Key, req.Content)
+		tail, err := api.Append(user, req.Aggregate, req.Entity, req.Content)
 		if err != nil {
 			createError(err).write(w)
 			return
@@ -85,21 +85,21 @@ func (api *FactApi) Handle(w http.ResponseWriter, r *http.Request, user *permiss
 		w.Header().Set("Location", "/")
 		send(w, http.StatusCreated, tail)
 	case Read:
-		read, err := api.Read(user, req.Aggregate, req.Key, req.Origin, req.PageSize)
+		read, err := api.Read(user, req.Aggregate, req.Entity, req.Origin, req.PageSize)
 		if err != nil {
 			createError(err).write(w)
 			return
 		}
 		send(w, http.StatusOK, read)
 	case Tail:
-		tail, err := api.Tail(user, req.Aggregate, req.Key)
+		tail, err := api.Tail(user, req.Aggregate, req.Entity)
 		if err != nil {
 			createError(err).write(w)
 			return
 		}
 		send(w, http.StatusOK, tail)
 	case Scan:
-		scan, err := api.Scan(user, req.Aggregate, req.PageSize)
+		scan, err := api.Scan(user, req.Aggregate)
 		if err != nil {
 			createError(err).write(w)
 			return
@@ -130,7 +130,7 @@ func (api *FactApi) Append(user *permissions.User, agg string, key string, conte
 
 	resp := TailResponse{
 		Aggregate: agg,
-		Key:       key,
+		Entity:    key,
 		Data:      tail.Record,
 		Total:     tail.Total,
 	}
@@ -156,7 +156,7 @@ func (api *FactApi) Read(user *permissions.User, aggregate string, key string, o
 
 	resp := ReadResponse{
 		Aggregate: aggregate,
-		Key:       key,
+		Entity:    key,
 		Data:      records.List,
 		Total:     records.Total,
 		PageSize:  records.PageSize,
@@ -184,20 +184,31 @@ func (api *FactApi) Tail(user *permissions.User, aggregate string, key string) (
 
 	resp := TailResponse{
 		Aggregate: aggregate,
-		Key:       key,
+		Entity:    key,
 		Data:      tail.Record,
 		Total:     tail.Total,
 	}
 	return &resp, nil
 }
 
-func (api *FactApi) Scan(user *permissions.User, aggregate string, pageSize int) (*ScanResponse, error) {
+func (api *FactApi) Scan(user *permissions.User, aggregate string) (*ScanResponse, error) {
 	err := user.CheckPermission(permissions.Scan, aggregate)
 	if err != nil {
 		return nil, err
 	}
 
-	panic("Scan not implemented")
+	keys, err := api.EventStore.Scan(aggregate)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := ScanResponse{
+		Aggregate: aggregate,
+		Total:     keys.Total,
+		Entities:  keys.List,
+	}
+
+	return &resp, nil
 }
 
 func send(w http.ResponseWriter, httpStatus int, object interface{}) {

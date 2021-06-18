@@ -102,7 +102,7 @@ func (b *BadgerEventStore) Register(t interface{}) {
 	gob.Register(t)
 }
 
-func (b *BadgerEventStore) Append(aggregate string, key string, content interface{}) (*Tail, error) {
+func (b *BadgerEventStore) Append(aggregate string, entity string, content interface{}) (*Tail, error) {
 	now := time.Now().UTC()
 
 	tail := Tail{
@@ -121,8 +121,8 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 		return nil, err
 	}
 
-	aggKey := []byte(strings.Join([]string{aggregate, key}, separator))
-	evtKey := []byte(strings.Join([]string{aggregate, key, string(k)}, separator))
+	aggKey := []byte(strings.Join([]string{aggregate, entity}, separator))
+	evtKey := []byte(strings.Join([]string{aggregate, entity, string(k)}, separator))
 	err = enc.Encode(tail.Record)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (b *BadgerEventStore) Append(aggregate string, key string, content interfac
 	return &tail, nil
 }
 
-func (b *BadgerEventStore) Read(aggregate string, key string, evtId string, maxCount int) (*RecordList, error) {
+func (b *BadgerEventStore) Read(aggregate string, entity string, evtId string, maxCount int) (*RecordList, error) {
 	db, err := b.kvStore()
 	if err != nil {
 		return nil, err
@@ -194,8 +194,8 @@ func (b *BadgerEventStore) Read(aggregate string, key string, evtId string, maxC
 		records.PageSize = maxPageSize
 	}
 
-	aggKey := []byte(strings.Join([]string{aggregate, key}, separator))
-	evtKey := []byte(strings.Join([]string{aggregate, key, evtId}, separator))
+	aggKey := []byte(strings.Join([]string{aggregate, entity}, separator))
+	evtKey := []byte(strings.Join([]string{aggregate, entity, evtId}, separator))
 
 	if err = db.View(func(txn *badger.Txn) error {
 		stats := AggregateStats{}
@@ -253,14 +253,14 @@ func (b *BadgerEventStore) Read(aggregate string, key string, evtId string, maxC
 	return &records, nil
 }
 
-func (b *BadgerEventStore) Tail(aggregate string, key string) (*Tail, error) {
+func (b *BadgerEventStore) Tail(aggregate string, entitty string) (*Tail, error) {
 	db, err := b.kvStore()
 	if err != nil {
 		return nil, err
 	}
 
 	tail := Tail{}
-	aggKey := strings.Join([]string{aggregate, key}, separator)
+	aggKey := strings.Join([]string{aggregate, entitty}, separator)
 	err = db.View(func(txn *badger.Txn) error {
 		stats := AggregateStats{}
 		item, err := txn.Get([]byte(aggKey))
@@ -283,7 +283,7 @@ func (b *BadgerEventStore) Tail(aggregate string, key string) (*Tail, error) {
 			return err
 		}
 
-		evtKey := []byte(strings.Join([]string{aggregate, key, string(k)}, separator))
+		evtKey := []byte(strings.Join([]string{aggregate, entitty, string(k)}, separator))
 		item, err = txn.Get(evtKey)
 		if err != nil {
 			return err
@@ -304,14 +304,15 @@ func (b *BadgerEventStore) Tail(aggregate string, key string) (*Tail, error) {
 	return &tail, nil
 }
 
-func (b *BadgerEventStore) ListKeysForAggregate(aggregate string) ([]string, error) {
-	prefix := []byte(aggregate)
-	var keys []string
+func (b *BadgerEventStore) Scan(aggregate string) (*EntityList, error) {
 	db, err := b.kvStore()
-
 	if err != nil {
 		return nil, err
 	}
+
+	keys := EntityList{}
+
+	prefix := []byte(aggregate)
 
 	if err = db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -329,13 +330,15 @@ func (b *BadgerEventStore) ListKeysForAggregate(aggregate string) ([]string, err
 			key := parts[1]
 
 			if len(lastKey) == 0 || lastKey != key {
-				keys = append(keys, key)
+				keys.List = append(keys.List, key)
+				keys.Total += 1
 				lastKey = key
 			}
 		}
 
-		if len(lastKey) > 0 && (len(keys) == 0 || keys[len(keys)-1] != lastKey) {
-			keys = append(keys, lastKey)
+		if len(lastKey) > 0 && (len(keys.List) == 0 || keys.List[len(keys.List)-1] != lastKey) {
+			keys.List = append(keys.List, lastKey)
+			keys.Total += 1
 		}
 
 		time.Sleep(1 * time.Millisecond)
@@ -344,7 +347,7 @@ func (b *BadgerEventStore) ListKeysForAggregate(aggregate string) ([]string, err
 		return nil, err
 	}
 
-	return keys, nil
+	return &keys, nil
 }
 
 func (b *BadgerEventStore) Close() error {

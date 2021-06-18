@@ -22,7 +22,7 @@ import "github.com/D-Haven/fact-totem/eventstore"
 type Request struct {
 	Action    Action      `json:"action"`
 	Aggregate string      `json:"aggregate"`
-	Key       string      `json:"key,omitempty"`
+	Entity    string      `json:"entity,omitempty"`
 	Content   interface{} `json:"content,omitempty"`
 	Origin    string      `json:"origin,omitempty"`
 	PageSize  int         `json:"page-size,omitempty"`
@@ -30,14 +30,14 @@ type Request struct {
 
 type TailResponse struct {
 	Aggregate string            `json:"aggregate"`
-	Key       string            `json:"key,omitempty"`
+	Entity    string            `json:"entity,omitempty"`
 	Data      eventstore.Record `json:"data"`
 	Total     uint              `json:"total"`
 }
 
 type ReadResponse struct {
 	Aggregate string              `json:"aggregate"`
-	Key       string              `json:"key"`
+	Entity    string              `json:"entity"`
 	Data      []eventstore.Record `json:"data"`
 	Total     uint                `json:"total"`
 	PageSize  int                 `json:"page-size"`
@@ -45,7 +45,6 @@ type ReadResponse struct {
 
 type ScanResponse struct {
 	Aggregate string   `json:"aggregate"`
-	Keys      []string `json:"keys"`
+	Entities  []string `json:"entities"`
 	Total     uint     `json:"total"`
-	PageSize  int      `json:"page-size"`
 }

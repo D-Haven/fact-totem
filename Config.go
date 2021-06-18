@@ -25,7 +25,7 @@ import (
 )
 
 type Config struct {
-	// JWT Key path
+	// JWT Entity path
 	JwtKeyPath string `yaml:"jwtKeyPath"`
 	// Project Db path
 	ProjectDb string `yaml:"project-db"`
@@ -102,7 +102,7 @@ func ValidateConfig(config *Config) error {
 	}
 
 	if tlsKeySpecified && !tlsCertSpecified {
-		return fmt.Errorf("TLS Key specified, but no certificate was provided")
+		return fmt.Errorf("TLS Entity specified, but no certificate was provided")
 	}
 
 	if err := ValidateOptionalFile(config.Server.TLS.KeyFile); err != nil {

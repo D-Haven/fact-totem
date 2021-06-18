@@ -28,10 +28,9 @@ type RecordList struct {
 	PageSize int
 }
 
-type KeyList struct {
-	List     []string
-	Total    uint
-	PageSize int
+type EntityList struct {
+	List  []string
+	Total uint
 }
 
 // EventStore provides an interface to store events for a topic, and retrieve them later.
@@ -39,13 +38,13 @@ type EventStore interface {
 	// Register a type for (de)serialization, needed to store and reconstitute objects
 	Register(t interface{})
 	// Append append an event to the event store for the fact
-	Append(aggregate string, key string, content interface{}) (*Tail, error)
+	Append(aggregate string, entity string, content interface{}) (*Tail, error)
 	// Tail gets the last event id
-	Tail(aggregate string, key string) (*Tail, error)
+	Tail(aggregate string, entity string) (*Tail, error)
 	// Read the events for an aggregate from the identified event id
-	Read(aggregate string, key string, originEventId string, maxCount int) (*RecordList, error)
-	// ListKeysForAggregate will list all keys with the aggregate prefix
-	ListKeysForAggregate(aggregate string) ([]string, error)
+	Read(aggregate string, entity string, originEventId string, maxCount int) (*RecordList, error)
+	// Scan will list all keys in the aggregate (excluding individual events)
+	Scan(aggregate string) (*EntityList, error)
 	// Close the event store
 	Close() error
 }
