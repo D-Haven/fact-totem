@@ -37,14 +37,19 @@ func TestBadgerEventStore_Tail(t *testing.T) {
 	key := "1"
 	content := Test{Value: 1}
 
-	evtId, err := store.Append(aggregate, key, content)
+	add, err := store.Append(aggregate, key, content)
 	if err != nil {
 		t.Error(err)
 	}
 
-	tailId, err := store.Tail(aggregate, key)
-	if evtId != tailId {
-		t.Errorf("expected tail '%s' but received tail '%s'", evtId, tailId)
+	tail, err := store.Tail(aggregate, key)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if add.Fact.Id != tail.Fact.Id {
+		t.Errorf("expected tail '%s' but received tail '%s'", add.Fact.Id, tail.Fact.Id)
 	}
 }
 
@@ -60,31 +65,35 @@ func TestBadgerEventStore_Append(t *testing.T) {
 	key := "1"
 	content := Test{Value: 1}
 
-	evtId, err := store.Append(aggregate, key, content)
+	tail, err := store.Append(aggregate, key, content)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(evtId) == 0 {
+	evtId := tail.Fact.Id
+
+	if len(evtId.String()) == 0 {
 		t.Error("expected the eventId to be returned")
 	}
 
-	results, lastEvt, err := store.Read(aggregate, key)
+	results, err := store.Read(aggregate, key, "", -1)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
+	lastEvt := results.List[len(results.List)-1].Id
+
 	if evtId != lastEvt {
 		t.Error("expected same event to be returned")
 	}
 
-	if len(results) != 1 {
-		t.Errorf("Incorrect number of events: %d", len(results))
+	if len(results.List) != 1 {
+		t.Errorf("Incorrect number of events: %d", len(results.List))
 	}
 
-	if !reflect.DeepEqual(results[0], content) {
-		t.Errorf("Expected origional content \"%v\", but received \"%v\"", content, results[0])
+	if !reflect.DeepEqual(results.List[0].Content, content) {
+		t.Errorf("Expected origional content \"%v\", but received \"%v\"", content, results.List[0].Content)
 	}
 }
 
@@ -122,22 +131,22 @@ func TestBadgerEventStore_AppendWithMultipleFacts(t *testing.T) {
 		}
 	}
 
-	results1, _, err := store.Read(aggregate, key1)
+	results1, err := store.Read(aggregate, key1, "", -1)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(results1) != 3 {
-		t.Errorf("Incorrect number of events: %d", len(results1))
+	if results1.Total != 3 {
+		t.Errorf("Incorrect number of events: %d", results1.Total)
 	}
 
-	results2, _, err := store.Read(aggregate, key2)
+	results2, err := store.Read(aggregate, key2, "", -1)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(results2) != 9 {
-		t.Errorf("Incorrect number of events: %d", len(results2))
+	if results2.Total != 9 {
+		t.Errorf("Incorrect number of events: %d", results2.Total)
 	}
 }
 
@@ -157,10 +166,11 @@ func TestBadgerEventStore_ReadFrom(t *testing.T) {
 	var err error
 
 	for i := 0; i < 5; i++ {
-		lastEvt, err = store.Append(aggregate, key, Test{Value: i})
+		add, err := store.Append(aggregate, key, Test{Value: i})
 		if err != nil {
 			t.Error(err)
 		}
+		lastEvt = add.Fact.Id.String()
 	}
 
 	for i := 0; i < 5; i++ {
@@ -173,23 +183,31 @@ func TestBadgerEventStore_ReadFrom(t *testing.T) {
 	tail, err := store.Tail(aggregate, key)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
-	if tail <= lastEvt {
-		t.Errorf("There should be events after the last event we captured.  Captured: %s Tail: %s", lastEvt, tail)
+	if tail.Fact.Id.String() <= lastEvt {
+		t.Errorf("There should be events after the last event we captured.  Captured: %s Tail: %s", lastEvt, tail.Fact.Id)
 	}
 
-	results, lastEvt, err := store.ReadFrom(aggregate, key, lastEvt)
+	results, err := store.Read(aggregate, key, lastEvt, -1)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
-	if len(results) != 5 {
-		t.Errorf("expected %d results, received %d", 5, len(results))
+	lastEvt = results.List[len(results.List)-1].Id.String()
+
+	if results.Total != 10 {
+		t.Errorf("expected %d grand total events in the store, but there are only %d", 10, results.Total)
 	}
 
-	if tail != lastEvt {
-		t.Errorf("after reading from the event, expected to be caught up.  Tail %s, Last Event %s", tail, lastEvt)
+	if len(results.List) != 5 {
+		t.Errorf("expected %d results returned in this request, received %d", 5, len(results.List))
+	}
+
+	if tail.Fact.Id.String() != lastEvt {
+		t.Errorf("after reading from the event, expected to be caught up.  Tail %s, Last Event %s", tail.Fact.Id, lastEvt)
 	}
 }
 
@@ -218,16 +236,16 @@ func TestBadgerEventStore_ListKeysForAggregate(t *testing.T) {
 		}
 	}
 
-	keys, err := store.ListKeysForAggregate(aggregate)
+	keys, err := store.Scan(aggregate)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(keys) != targetKeys {
-		t.Errorf("expected %d keys, received %d", targetKeys, len(keys))
+	if int(keys.Total) != targetKeys {
+		t.Errorf("expected %d keys, received %d", targetKeys, keys.Total)
 	}
 
-	for i, key := range keys {
+	for i, key := range keys.List {
 		expected := string('a' + byte(i))
 		if key != expected {
 			t.Errorf("unexpected key: expected %s, received %s", expected, key)

@@ -46,7 +46,8 @@ func TestMain(m *testing.M) {
 
 func TestReadValidConfigFromYaml(t *testing.T) {
 	content := `
-jwtKeyPath: ./jwt.key
+token:
+  keyPath: ./jwt.key
 server:
   port: 8443
   tls:
@@ -65,7 +66,7 @@ server:
 	}
 
 	Check(t, "server:port", "8443", config.Server.Port)
-	Check(t, "jwtKeyPath:", "./jwt.key", config.JwtKeyPath)
+	Check(t, "token:keyPath:", "./jwt.key", config.Token.KeyPath)
 	Check(t, "server:tls:certificate", "/.cert/tls.crt", config.Server.TLS.CertFile)
 	Check(t, "server:tls:key", "/.cert/tls.key", config.Server.TLS.KeyFile)
 }
@@ -126,11 +127,11 @@ func TestValidateOptionalFileIfExists(t *testing.T) {
 }
 
 func TestValidateOptionalFileIfDirectory(t *testing.T) {
-	path := "./handlers"
+	path := "./webapi"
 	err := ValidateOptionalFile(path)
 
 	if err == nil {
-		t.Fatalf("./handlers is a directory, but no error returned")
+		t.Fatalf("./webapi is a directory, but no error returned")
 	}
 }
 
@@ -166,7 +167,7 @@ func TestGetValidatedConfigFailure(t *testing.T) {
 		t.Fatal("No error was specified, but config was empty")
 	}
 
-	Check(t, "JwtKeyPath", "./jwt.key", config.JwtKeyPath)
+	Check(t, "JwtKeyPath", "./jwt.key", config.Token.KeyPath)
 	Check(t, "Server:Port", "8080", config.Server.Port)
 	Check(t, "Server:TLS:KeyFile", "", config.Server.TLS.KeyFile)
 	Check(t, "Server:TLS:CertFile", "", config.Server.TLS.CertFile)

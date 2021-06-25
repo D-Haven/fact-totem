@@ -17,8 +17,8 @@
 package main
 
 import (
-	"github.com/D-Haven/fact-totem/handlers"
 	"github.com/D-Haven/fact-totem/permissions"
+	"github.com/D-Haven/fact-totem/webapi"
 	"github.com/lestrrat-go/jwx/jwa"
 	"log"
 	"math/rand"
@@ -27,13 +27,13 @@ import (
 
 func ConfigureJwt(config *Config) {
 	// Need to make this k8s service account compliant
-	handlers.JwtSigType = jwa.HS512
+	webapi.JwtSigType = jwa.HS512
 
-	content, err := os.ReadFile(config.JwtKeyPath)
+	content, err := os.ReadFile(config.Token.KeyPath)
 	if os.IsNotExist(err) {
 		content = make([]byte, 4096)
 		rand.Read(content)
-		err := os.WriteFile(config.JwtKeyPath, content, 0640)
+		err := os.WriteFile(config.Token.KeyPath, content, 0640)
 		if err != nil {
 			log.Fatalf("Could not create key jwt key file: %s", err)
 		}
@@ -41,7 +41,7 @@ func ConfigureJwt(config *Config) {
 		log.Fatalf("Unexpected error reading the key: %s", err)
 	}
 
-	handlers.JwtKey = content
+	webapi.JwtKey = content
 
 	repo := permissions.Repository{}
 	file, err := os.Open(config.PermissionsPath)
@@ -59,5 +59,5 @@ func ConfigureJwt(config *Config) {
 		log.Fatalf("Could not read the permissions file: %s", err)
 	}
 
-	handlers.UserRepo = &repo
+	webapi.UserRepo = &repo
 }

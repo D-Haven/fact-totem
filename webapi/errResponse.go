@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package handlers
+package webapi
 
 import (
 	"encoding/json"

@@ -17,8 +17,8 @@
 package main
 
 import (
-	"github.com/D-Haven/fact-totem/handlers"
 	"github.com/D-Haven/fact-totem/version"
+	"github.com/D-Haven/fact-totem/webapi"
 	"github.com/heptiolabs/healthcheck"
 	"golang.org/x/net/context"
 	"log"
@@ -64,7 +64,7 @@ func main() {
 	multiplexHandler.Handle("/ready", health)
 	multiplexHandler.Handle("/live", health)
 
-	projectApi, err := handlers.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
+	projectApi, err := webapi.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func main() {
 		}
 	}()
 
-	authHandler := handlers.AuthHandler(projectApi.Handle)
+	authHandler := webapi.AuthHandler(projectApi.Handle)
 	multiplexHandler.Handle("/", authHandler)
 
 	interrupt := make(chan os.Signal, 1)
