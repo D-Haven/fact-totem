@@ -55,8 +55,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ConfigureJwt(config)
-
 	health := healthcheck.NewHandler()
 	health.AddLivenessCheck("go-routinethreshold", healthcheck.GoroutineCountCheck(100))
 
@@ -75,8 +73,23 @@ func main() {
 		}
 	}()
 
-	authHandler := webapi.AuthHandler(projectApi.Handle)
-	multiplexHandler.Handle("/", authHandler)
+	users, err := LoadUserRepo(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	validator, err := config.Token.Validator()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	authHandler := webapi.AuthHandler{
+		Validator: validator,
+		Handler:   projectApi.Handle,
+		UserRepo:  users,
+	}
+
+	multiplexHandler.Handle("/", &authHandler)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

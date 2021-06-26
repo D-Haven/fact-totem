@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/D-Haven/fact-totem/permissions"
 	"github.com/D-Haven/fact-totem/webapi"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -141,4 +142,24 @@ func ValidateOptionalFile(path string) error {
 	}
 
 	return nil
+}
+
+func LoadUserRepo(config *Config) (permissions.UserRepo, error) {
+	repo := permissions.Repository{}
+	file, err := os.Open(config.PermissionsPath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	err = repo.LoadPermissions(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return &repo, nil
 }
