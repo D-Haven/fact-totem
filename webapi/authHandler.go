@@ -14,40 +14,35 @@
  * limitations under the License.
  */
 
-package handlers
+package webapi
 
 import (
 	"github.com/D-Haven/fact-totem/permissions"
-	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
 	"net/http"
-	"time"
-)
-
-var (
-	JwtSigType jwa.SignatureAlgorithm
-	JwtKey     []byte
-	UserRepo   permissions.UserRepo
 )
 
 type AuthenticatedHandler func(w http.ResponseWriter, r *http.Request, user *permissions.User)
 
-func AuthHandler(authHandler AuthenticatedHandler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, _ := jwt.ParseRequest(r, jwt.WithVerify(JwtSigType, JwtKey))
-		var user *permissions.User
+type AuthHandler struct {
+	UserRepo  permissions.UserRepo
+	Validator Validator
+	Handler   AuthenticatedHandler
+}
 
-		if token != nil {
-			err := jwt.Validate(token,
-				jwt.WithAcceptableSkew(2*time.Second))
-			if err != nil {
-				createError(permissions.NotAuthorized{Cause: err}).write(w)
-				return
-			}
+func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	token, _ := jwt.ParseRequest(r)
+	var user *permissions.User
 
-			user = UserRepo.FindUser(token.Subject())
+	if token != nil {
+		err := h.Validator.IsValid(token)
+		if err != nil {
+			createError(permissions.NotAuthorized{Cause: err}).write(w)
+			return
 		}
 
-		authHandler(w, r, user)
-	})
+		user = h.UserRepo.FindUser(token.Subject())
+	}
+
+	h.Handler(w, r, user)
 }

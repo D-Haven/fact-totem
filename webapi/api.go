@@ -15,7 +15,7 @@
  *
  */
 
-package handlers
+package webapi
 
 import (
 	"encoding/json"
@@ -55,6 +55,10 @@ func NewApi(path string, keyfile string, keyDuration time.Duration) (*FactApi, e
 	api.EventStore.Register([]interface{}{})
 
 	return &api, nil
+}
+
+func (api *FactApi) Close() error {
+	return api.EventStore.Close()
 }
 
 func (api *FactApi) Handle(w http.ResponseWriter, r *http.Request, user *permissions.User) {

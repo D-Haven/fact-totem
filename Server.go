@@ -17,8 +17,8 @@
 package main
 
 import (
-	"github.com/D-Haven/fact-totem/handlers"
 	"github.com/D-Haven/fact-totem/version"
+	"github.com/D-Haven/fact-totem/webapi"
 	"github.com/heptiolabs/healthcheck"
 	"golang.org/x/net/context"
 	"log"
@@ -55,8 +55,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ConfigureJwt(config)
-
 	health := healthcheck.NewHandler()
 	health.AddLivenessCheck("go-routinethreshold", healthcheck.GoroutineCountCheck(100))
 
@@ -64,12 +62,34 @@ func main() {
 	multiplexHandler.Handle("/ready", health)
 	multiplexHandler.Handle("/live", health)
 
-	projectApi, err := handlers.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
+	projectApi, err := webapi.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
 	if err != nil {
 		log.Fatal(err)
 	}
-	authHandler := handlers.AuthHandler(projectApi.Handle)
-	multiplexHandler.Handle("/", authHandler)
+	defer func() {
+		err := projectApi.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	users, err := LoadUserRepo(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	validator, err := config.Token.Validator()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	authHandler := webapi.AuthHandler{
+		Validator: validator,
+		Handler:   projectApi.Handle,
+		UserRepo:  users,
+	}
+
+	multiplexHandler.Handle("/", &authHandler)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

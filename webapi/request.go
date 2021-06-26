@@ -15,7 +15,7 @@
  *
  */
 
-package handlers
+package webapi
 
 import "github.com/D-Haven/fact-totem/eventstore"
 
