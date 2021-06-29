@@ -21,7 +21,6 @@ import (
 	"encoding/gob"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/oklog/ulid/v2"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -172,10 +171,11 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 		return nil, err
 	}
 
-	if runtime.GOOS == "windows" {
-		// Windows is not officially supported for badger, but this delay seems to work.
-		time.Sleep(1 * time.Millisecond)
-	}
+	// The tests run from within a container still had this issue
+	//if runtime.GOOS == "windows" {
+	// Windows is not officially supported for badger, but this delay seems to work.
+	time.Sleep(1 * time.Millisecond)
+	//}
 
 	return &tail, nil
 }
