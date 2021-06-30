@@ -171,11 +171,10 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 		return nil, err
 	}
 
-	// The tests run from within a container still had this issue
-	//if runtime.GOOS == "windows" {
-	// Windows is not officially supported for badger, but this delay seems to work.
+	// There is a race condition or timing issue in Badger, and it might be my older hardware to blame.
+	// Nevertheless, in constrained environments like a Kubernetes cluster with less than a whole compute unit
+	// provisioned we might run into the issue again.
 	time.Sleep(1 * time.Millisecond)
-	//}
 
 	return &tail, nil
 }
