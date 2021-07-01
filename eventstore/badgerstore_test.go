@@ -25,7 +25,7 @@ type Test struct {
 	Value int
 }
 
-func TestBadgerEventStore_Tail(t *testing.T) {
+func TestBadgerEventStoreTail(t *testing.T) {
 	store := MemoryStore()
 	defer func() {
 		if err := store.Close(); err != nil {
@@ -53,7 +53,7 @@ func TestBadgerEventStore_Tail(t *testing.T) {
 	}
 }
 
-func TestBadgerEventStore_Append(t *testing.T) {
+func TestBadgerEventStoreAppend(t *testing.T) {
 	store := MemoryStore()
 	defer func() {
 		if err := store.Close(); err != nil {
@@ -97,7 +97,7 @@ func TestBadgerEventStore_Append(t *testing.T) {
 	}
 }
 
-func TestBadgerEventStore_AppendWithMultipleFacts(t *testing.T) {
+func TestBadgerEventStoreAppendWithMultipleFacts(t *testing.T) {
 	store := MemoryStore()
 	defer func() {
 		if err := store.Close(); err != nil {
@@ -150,7 +150,7 @@ func TestBadgerEventStore_AppendWithMultipleFacts(t *testing.T) {
 	}
 }
 
-func TestBadgerEventStore_ReadFrom(t *testing.T) {
+func TestBadgerEventStoreReadFrom(t *testing.T) {
 	store := MemoryStore()
 	defer func() {
 		if err := store.Close(); err != nil {
@@ -211,7 +211,7 @@ func TestBadgerEventStore_ReadFrom(t *testing.T) {
 	}
 }
 
-func TestBadgerEventStore_ListKeysForAggregate(t *testing.T) {
+func TestBadgerEventStoreScanAggregate(t *testing.T) {
 	store := MemoryStore()
 	defer func() {
 		if err := store.Close(); err != nil {

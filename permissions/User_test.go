@@ -19,7 +19,7 @@ package permissions
 
 import "testing"
 
-func TestUser_CheckPermission_AllowWildcard(t *testing.T) {
+func TestUserCheckPermissionAllowWildcard(t *testing.T) {
 	u := User{
 		Subject: "test",
 		Read:    []string{"*"},
@@ -40,7 +40,7 @@ func TestUser_CheckPermission_AllowWildcard(t *testing.T) {
 	}
 }
 
-func TestUser_CheckPermission_NeverAllowEmptyAggregate(t *testing.T) {
+func TestUserCheckPermissionNeverAllowEmptyAggregate(t *testing.T) {
 	u := User{
 		Subject: "test",
 		Read:    []string{""},
@@ -61,7 +61,7 @@ func TestUser_CheckPermission_NeverAllowEmptyAggregate(t *testing.T) {
 	}
 }
 
-func TestUser_CheckPermission_CanRead(t *testing.T) {
+func TestUserCheckPermissionCanRead(t *testing.T) {
 	u := User{
 		Subject: "foo",
 		Read:    []string{"bar"},
@@ -86,7 +86,7 @@ func TestUser_CheckPermission_CanRead(t *testing.T) {
 	}
 }
 
-func TestUser_CheckPermission_CanAppend(t *testing.T) {
+func TestUserCheckPermissionCanAppend(t *testing.T) {
 	u := User{
 		Subject: "baz",
 		Read:    []string{},
@@ -111,7 +111,7 @@ func TestUser_CheckPermission_CanAppend(t *testing.T) {
 	}
 }
 
-func TestUser_CheckPermission_CanScan(t *testing.T) {
+func TestUserCheckPermissionCanScan(t *testing.T) {
 	u := User{
 		Subject: "baz",
 		Read:    []string{},

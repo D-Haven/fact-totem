@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-func TestRepository_LoadPermissions(t *testing.T) {
+func TestRepositoryLoadPermissions(t *testing.T) {
 	repo := Repository{}
 
 	const userStream = `
@@ -48,7 +48,7 @@ func TestRepository_LoadPermissions(t *testing.T) {
 	}
 }
 
-func TestRepository_LoadPermissions_wideOpen(t *testing.T) {
+func TestRepositoryLoadPermissionsWideOpen(t *testing.T) {
 	repo := Repository{}
 
 	const userStream = `

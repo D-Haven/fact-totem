@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-func Test_ulidGenerator_NewId(t *testing.T) {
+func TestGeneratorNewId(t *testing.T) {
 	generator := NewIdGenerator()
 
 	var lastId ulid.ULID
