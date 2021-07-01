@@ -1,3 +1,5 @@
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=D-Haven_fact-totem&metric=alert_status)](https://sonarcloud.io/dashboard?id=D-Haven_fact-totem)
+
 # Fact Totem
 The name "Fact Totem" is layered:
 
