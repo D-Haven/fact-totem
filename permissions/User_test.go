@@ -27,17 +27,9 @@ func TestUserCheckPermissionAllowWildcard(t *testing.T) {
 		Scan:    []string{"*"},
 	}
 
-	if err := u.CheckPermission(Read, "foo"); err != nil {
-		t.Errorf("Expected permitted but was %s", err)
-	}
-
-	if err := u.CheckPermission(Append, "bar"); err != nil {
-		t.Errorf("Expected permitted but was %s", err)
-	}
-
-	if err := u.CheckPermission(Scan, "baz"); err != nil {
-		t.Errorf("Expected permitted but was %s", err)
-	}
+	verifyPermitted(t, u, Read, "foo")
+	verifyPermitted(t, u, Append, "bar")
+	verifyPermitted(t, u, Scan, "baz")
 }
 
 func TestUserCheckPermissionNeverAllowEmptyAggregate(t *testing.T) {
@@ -48,17 +40,9 @@ func TestUserCheckPermissionNeverAllowEmptyAggregate(t *testing.T) {
 		Scan:    []string{""},
 	}
 
-	if u.CheckPermission(Read, "") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Append, "") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Scan, "") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
+	verifyDenied(t, u, Read, "")
+	verifyDenied(t, u, Append, "")
+	verifyDenied(t, u, Scan, "")
 }
 
 func TestUserCheckPermissionCanRead(t *testing.T) {
@@ -69,21 +53,10 @@ func TestUserCheckPermissionCanRead(t *testing.T) {
 		Scan:    []string{},
 	}
 
-	if err := u.CheckPermission(Read, "bar"); err != nil {
-		t.Errorf("Expected success but received error: %s", err)
-	}
-
-	if u.CheckPermission(Read, "fubar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Append, "bar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Scan, "bar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
+	verifyPermitted(t, u, Read, "bar")
+	verifyDenied(t, u, Read, "fubar")
+	verifyDenied(t, u, Append, "bar")
+	verifyDenied(t, u, Scan, "bar")
 }
 
 func TestUserCheckPermissionCanAppend(t *testing.T) {
@@ -94,21 +67,10 @@ func TestUserCheckPermissionCanAppend(t *testing.T) {
 		Scan:    []string{},
 	}
 
-	if err := u.CheckPermission(Append, "bar"); err != nil {
-		t.Errorf("Expected success but received error: %s", err)
-	}
-
-	if u.CheckPermission(Append, "fubar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Read, "bar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Scan, "bar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
+	verifyPermitted(t, u, Append, "bar")
+	verifyDenied(t, u, Read, "bar")
+	verifyDenied(t, u, Append, "fubar")
+	verifyDenied(t, u, Scan, "bar")
 }
 
 func TestUserCheckPermissionCanScan(t *testing.T) {
@@ -119,19 +81,20 @@ func TestUserCheckPermissionCanScan(t *testing.T) {
 		Scan:    []string{"bar"},
 	}
 
-	if err := u.CheckPermission(Scan, "bar"); err != nil {
-		t.Errorf("Expected success but received error: %s", err)
-	}
+	verifyPermitted(t, u, Scan, "bar")
+	verifyDenied(t, u, Read, "bar")
+	verifyDenied(t, u, Append, "bar")
+	verifyDenied(t, u, Scan, "fubar")
+}
 
-	if u.CheckPermission(Scan, "fubar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
+func verifyPermitted(t *testing.T, u User, perm string, aggregate string) {
+	if err := u.CheckPermission(perm, aggregate); err != nil {
+		t.Errorf("expected %s:%s permission but was %s", perm, aggregate, err)
 	}
+}
 
-	if u.CheckPermission(Read, "bar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
-	}
-
-	if u.CheckPermission(Append, "bar") == nil {
-		t.Errorf("Expected NotAuthorized but was allowed")
+func verifyDenied(t *testing.T, u User, perm string, aggregate string) {
+	if u.CheckPermission(perm, aggregate) == nil {
+		t.Errorf("expected NotAuthorized but was allowed")
 	}
 }
