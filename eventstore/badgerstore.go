@@ -54,6 +54,7 @@ func MemoryStore() EventStore {
 	return &BadgerEventStore{
 		MemoryOnly: true,
 		RootDir:    "",
+		generator:  NewIdGenerator(),
 	}
 }
 
@@ -62,6 +63,7 @@ func FileStore(path string) EventStore {
 		RootDir:       path,
 		MemoryOnly:    false,
 		EncryptionKey: nil,
+		generator:     NewIdGenerator(),
 	}
 }
 
@@ -71,6 +73,7 @@ func EncryptedFileStore(path string, key []byte, rotationDur time.Duration) Even
 		MemoryOnly:                 false,
 		EncryptionKey:              key,
 		EncryptionRotationDuration: rotationDur,
+		generator:                  NewIdGenerator(),
 	}
 }
 
@@ -79,7 +82,6 @@ func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
 		return b.db, nil
 	}
 
-	b.generator = NewIdGenerator()
 	opts := badger.DefaultOptions(b.RootDir).WithInMemory(b.MemoryOnly)
 
 	if b.EncryptionKey != nil && len(b.EncryptionKey) >= 128 {
