@@ -31,7 +31,7 @@ type ulidGenerator struct {
 }
 
 func NewIdGenerator() IdGenerator {
-	source := rand.NewSource(time.Now().UnixNano())
+	source := rand.NewSource(time.Now().UTC().UnixNano())
 	rnd := rand.New(source)
 
 	return &ulidGenerator{

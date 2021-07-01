@@ -77,37 +77,50 @@ func EncryptedFileStore(path string, key []byte, rotationDur time.Duration) Even
 	}
 }
 
-func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
-	if b.db != nil {
-		return b.db, nil
-	}
-
-	opts := badger.DefaultOptions(b.RootDir).WithInMemory(b.MemoryOnly)
-
-	if b.EncryptionKey != nil && len(b.EncryptionKey) >= 128 {
-		opts = opts.WithEncryptionKey(b.EncryptionKey)
-		opts = opts.WithEncryptionKeyRotationDuration(b.EncryptionRotationDuration)
-		// May need to tune this.. data store shouldn't get too big
-		opts = opts.WithIndexCacheSize(100 << 20) // 100 mb
-	}
-
-	b.Register(Fact{})
-	db, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	b.db = db
-	return b.db, nil
-}
-
 func (b *BadgerEventStore) Register(t interface{}) {
 	gob.Register(t)
 }
 
-func (b *BadgerEventStore) Append(aggregate string, entity string, content interface{}) (*Tail, error) {
-	now := time.Now().UTC()
+func (b *BadgerEventStore) readEntityStats(txn *badger.Txn, aggregate string, entity string) (*AggregateStats, error) {
+	stats := AggregateStats{}
+	aggKey := b.aggregateKey(aggregate, entity)
 
+	item, err := txn.Get(aggKey)
+	if err == nil {
+		// If there is an error then this is a virgin aggregate so there is nothing to read
+		err = item.Value(func(val []byte) error {
+			dec := gob.NewDecoder(bytes.NewBuffer(val))
+			return dec.Decode(&stats)
+		})
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &stats, nil
+}
+
+func (b *BadgerEventStore) updateEntityStats(txn *badger.Txn, aggregate string, entity string, stats *AggregateStats) error {
+	aggKey := b.aggregateKey(aggregate, entity)
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(stats)
+	if err != nil {
+		return err
+	}
+
+	return txn.Set(aggKey, buf.Bytes())
+}
+
+func (b *BadgerEventStore) Append(aggregate string, entity string, content interface{}) (*Tail, error) {
+	db, err := b.kvStore()
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
 	tail := Tail{
 		Fact: Fact{
 			Id:        b.generator.NewId(now),
@@ -116,41 +129,13 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 		},
 	}
 
-	var c bytes.Buffer
-	enc := gob.NewEncoder(&c)
-
-	k, err := tail.Fact.Id.MarshalText()
-	if err != nil {
-		return nil, err
-	}
-
-	aggKey := []byte(strings.Join([]string{aggregate, entity}, separator))
-	factKey := []byte(strings.Join([]string{aggregate, entity, string(k)}, separator))
-	err = enc.Encode(tail.Fact)
-	if err != nil {
-		return nil, err
-	}
-
-	value := c.Bytes()
-
-	db, err := b.kvStore()
-	if err != nil {
-		return nil, err
-	}
-
 	if err = db.Update(func(txn *badger.Txn) error {
-		stats := AggregateStats{}
-		item, err := txn.Get(aggKey)
-		if err == nil {
-			// If there is an error then this is a virgin aggregate so there is nothing to read
-			err = item.Value(func(val []byte) error {
-				dec := gob.NewDecoder(bytes.NewBuffer(val))
-				return dec.Decode(&stats)
-			})
+		stats, err := b.readEntityStats(txn, aggregate, entity)
+		factKey := b.factKey(aggregate, entity, tail.Fact.Id)
 
-			if err != nil {
-				return err
-			}
+		value, err := encodeFact(tail.Fact)
+		if err != nil {
+			return err
 		}
 
 		entry := badger.NewEntry(factKey, value)
@@ -163,15 +148,7 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 		stats.Total += 1
 		tail.Total = stats.Total
 
-		var buf bytes.Buffer
-		enc := gob.NewEncoder(&buf)
-		err = enc.Encode(&stats)
-
-		if err != nil {
-			return err
-		}
-
-		return txn.Set(aggKey, buf.Bytes())
+		return b.updateEntityStats(txn, aggregate, entity, stats)
 	}); err != nil {
 		return nil, err
 	}
@@ -197,17 +174,7 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, factId string, 
 	factKey := []byte(strings.Join([]string{aggregate, entity, factId}, separator))
 
 	if err = db.View(func(txn *badger.Txn) error {
-		stats := AggregateStats{}
-		item, err := txn.Get(aggKey)
-		if err != nil {
-			return err
-		}
-
-		// If there is an error then this is a virgin aggregate so there is nothing to read
-		err = item.Value(func(val []byte) error {
-			dec := gob.NewDecoder(bytes.NewBuffer(val))
-			return dec.Decode(&stats)
-		})
+		stats, err := b.readEntityStats(txn, aggregate, entity)
 		if err != nil {
 			return err
 		}
@@ -223,25 +190,13 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, factId string, 
 		for it.Seek(factKey); len(records.List) < records.PageSize && it.ValidForPrefix(aggKey); it.Next() {
 			item := it.Item()
 
-			err := item.Value(func(val []byte) error {
-				c := bytes.NewBuffer(val)
-				dec := gob.NewDecoder(c)
-				var record Fact
-				if err = dec.Decode(&record); err != nil {
-					return err
-				}
-
-				recordId, _ := record.Id.MarshalText()
-				if string(recordId) <= factId {
-					return nil
-				}
-
-				records.List = append(records.List, record)
-				return nil
-			})
-
+			record, err := decodeFact(item)
 			if err != nil {
 				return err
+			}
+
+			if record.Id.String() > factId {
+				records.List = append(records.List, *record)
 			}
 		}
 		return nil
@@ -252,49 +207,34 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, factId string, 
 	return &records, nil
 }
 
-func (b *BadgerEventStore) Tail(aggregate string, entitty string) (*Tail, error) {
+func (b *BadgerEventStore) Tail(aggregate string, entity string) (*Tail, error) {
 	db, err := b.kvStore()
 	if err != nil {
 		return nil, err
 	}
 
 	tail := Tail{}
-	aggKey := strings.Join([]string{aggregate, entitty}, separator)
 	err = db.View(func(txn *badger.Txn) error {
-		stats := AggregateStats{}
-		item, err := txn.Get([]byte(aggKey))
-		if err != nil {
-			return err
-		}
-
-		// If there is an error then this is a virgin aggregate so there is nothing to read
-		err = item.Value(func(val []byte) error {
-			dec := gob.NewDecoder(bytes.NewBuffer(val))
-			return dec.Decode(&stats)
-		})
+		stats, err := b.readEntityStats(txn, aggregate, entity)
 		if err != nil {
 			return err
 		}
 
 		tail.Total = stats.Total
-		k, err := stats.LastId.MarshalText()
+
+		evtKey := b.factKey(aggregate, entity, stats.LastId)
+		item, err := txn.Get(evtKey)
 		if err != nil {
 			return err
 		}
 
-		evtKey := []byte(strings.Join([]string{aggregate, entitty, string(k)}, separator))
-		item, err = txn.Get(evtKey)
+		record, err := decodeFact(item)
 		if err != nil {
 			return err
 		}
 
-		err = item.Value(func(val []byte) error {
-			c := bytes.NewBuffer(val)
-			dec := gob.NewDecoder(c)
-			return dec.Decode(&tail.Fact)
-		})
-
-		return err
+		tail.Fact = *record
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -340,7 +280,6 @@ func (b *BadgerEventStore) Scan(aggregate string) (*EntityList, error) {
 			keys.Total += 1
 		}
 
-		time.Sleep(1 * time.Millisecond)
 		return nil
 	}); err != nil {
 		return nil, err
@@ -358,4 +297,68 @@ func (b *BadgerEventStore) Close() error {
 	}
 
 	return nil
+}
+
+func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
+	if b.db != nil {
+		return b.db, nil
+	}
+
+	opts := badger.DefaultOptions(b.RootDir).WithInMemory(b.MemoryOnly)
+
+	if b.EncryptionKey != nil && len(b.EncryptionKey) >= 128 {
+		opts = opts.WithEncryptionKey(b.EncryptionKey)
+		opts = opts.WithEncryptionKeyRotationDuration(b.EncryptionRotationDuration)
+		// May need to tune this.. data store shouldn't get too big
+		opts = opts.WithIndexCacheSize(100 << 20) // 100 mb
+	}
+
+	b.Register(Fact{})
+	db, err := badger.Open(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	b.db = db
+	return b.db, nil
+}
+
+func (b *BadgerEventStore) aggregateKey(aggregate string, entity string) []byte {
+	return []byte(strings.Join([]string{aggregate, entity}, separator))
+}
+
+func (b *BadgerEventStore) factKey(aggregate string, entity string, factId ulid.ULID) []byte {
+	return []byte(strings.Join([]string{aggregate, entity, factId.String()}, separator))
+}
+
+func encodeFact(fact Fact) ([]byte, error) {
+	var c bytes.Buffer
+	enc := gob.NewEncoder(&c)
+
+	err := enc.Encode(fact)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.Bytes(), nil
+}
+
+func decodeFact(item *badger.Item) (*Fact, error) {
+	record := Fact{}
+
+	err := item.Value(func(val []byte) error {
+		c := bytes.NewBuffer(val)
+		dec := gob.NewDecoder(c)
+		if err := dec.Decode(&record); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &record, nil
 }
