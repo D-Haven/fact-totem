@@ -149,7 +149,8 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 			}
 		}
 
-		err = txn.Set(factKey, value)
+		entry := badger.NewEntry(factKey, value)
+		err = txn.SetEntry(entry)
 		if err != nil {
 			return err
 		}
@@ -170,11 +171,6 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 	}); err != nil {
 		return nil, err
 	}
-
-	// There is a race condition or timing issue in Badger, and it might be my older hardware to blame.
-	// Nevertheless, in constrained environments like a Kubernetes cluster with less than a whole compute unit
-	// provisioned we might run into the issue again.
-	time.Sleep(1 * time.Millisecond)
 
 	return &tail, nil
 }

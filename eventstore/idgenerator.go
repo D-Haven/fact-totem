@@ -22,9 +22,12 @@ import (
 	"time"
 )
 
+var (
+	source  = rand.NewSource(time.Now().UnixNano())
+	rnd     = rand.New(source)
+	entropy = ulid.Monotonic(rnd, 0)
+)
+
 func NewId(t time.Time) ulid.ULID {
-	source := rand.NewSource(t.UnixNano())
-	rnd := rand.New(source)
-	entropy := ulid.Monotonic(rnd, 0)
 	return ulid.MustNew(ulid.Timestamp(t), entropy)
 }
