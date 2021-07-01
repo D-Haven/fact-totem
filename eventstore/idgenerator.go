@@ -22,12 +22,23 @@ import (
 	"time"
 )
 
-var (
-	source  = rand.NewSource(time.Now().UnixNano())
-	rnd     = rand.New(source)
-	entropy = ulid.Monotonic(rnd, 0)
-)
+type IdGenerator interface {
+	NewId(t time.Time) ulid.ULID
+}
 
-func NewId(t time.Time) ulid.ULID {
-	return ulid.MustNew(ulid.Timestamp(t), entropy)
+type ulidGenerator struct {
+	entropy *ulid.MonotonicEntropy
+}
+
+func NewIdGenerator() IdGenerator {
+	source := rand.NewSource(time.Now().UnixNano())
+	rnd := rand.New(source)
+
+	return &ulidGenerator{
+		entropy: ulid.Monotonic(rnd, 0),
+	}
+}
+
+func (id *ulidGenerator) NewId(t time.Time) ulid.ULID {
+	return ulid.MustNew(ulid.Timestamp(t), id.entropy)
 }

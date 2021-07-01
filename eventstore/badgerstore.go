@@ -36,6 +36,7 @@ type BadgerEventStore struct {
 	EncryptionKey              []byte
 	EncryptionRotationDuration time.Duration
 	db                         *badger.DB
+	generator                  IdGenerator
 }
 
 type Fact struct {
@@ -78,6 +79,7 @@ func (b *BadgerEventStore) kvStore() (*badger.DB, error) {
 		return b.db, nil
 	}
 
+	b.generator = NewIdGenerator()
 	opts := badger.DefaultOptions(b.RootDir).WithInMemory(b.MemoryOnly)
 
 	if b.EncryptionKey != nil && len(b.EncryptionKey) >= 128 {
@@ -106,7 +108,7 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 
 	tail := Tail{
 		Fact: Fact{
-			Id:        NewId(now),
+			Id:        b.generator.NewId(now),
 			Timestamp: now,
 			Content:   content,
 		},
