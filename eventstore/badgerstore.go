@@ -81,39 +81,6 @@ func (b *BadgerEventStore) Register(t interface{}) {
 	gob.Register(t)
 }
 
-func (b *BadgerEventStore) readEntityStats(txn *badger.Txn, aggregate string, entity string) (*AggregateStats, error) {
-	stats := AggregateStats{}
-	aggKey := b.aggregateKey(aggregate, entity)
-
-	item, err := txn.Get(aggKey)
-	if err == nil {
-		// If there is an error then this is a virgin aggregate so there is nothing to read
-		err = item.Value(func(val []byte) error {
-			dec := gob.NewDecoder(bytes.NewBuffer(val))
-			return dec.Decode(&stats)
-		})
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &stats, nil
-}
-
-func (b *BadgerEventStore) updateEntityStats(txn *badger.Txn, aggregate string, entity string, stats *AggregateStats) error {
-	aggKey := b.aggregateKey(aggregate, entity)
-
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(stats)
-	if err != nil {
-		return err
-	}
-
-	return txn.Set(aggKey, buf.Bytes())
-}
-
 func (b *BadgerEventStore) Append(aggregate string, entity string, content interface{}) (*Tail, error) {
 	db, err := b.kvStore()
 	if err != nil {
@@ -129,9 +96,9 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 		},
 	}
 
-	if err = db.Update(func(txn *badger.Txn) error {
+	err = db.Update(func(txn *badger.Txn) error {
 		stats, err := b.readEntityStats(txn, aggregate, entity)
-		factKey := b.factKey(aggregate, entity, tail.Fact.Id)
+		factKey := b.factKey(aggregate, entity, tail.Fact.Id.String())
 
 		value, err := encodeFact(tail.Fact)
 		if err != nil {
@@ -149,7 +116,9 @@ func (b *BadgerEventStore) Append(aggregate string, entity string, content inter
 		tail.Total = stats.Total
 
 		return b.updateEntityStats(txn, aggregate, entity, stats)
-	}); err != nil {
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -170,10 +139,7 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, factId string, 
 		records.PageSize = maxPageSize
 	}
 
-	aggKey := []byte(strings.Join([]string{aggregate, entity}, separator))
-	factKey := []byte(strings.Join([]string{aggregate, entity, factId}, separator))
-
-	if err = db.View(func(txn *badger.Txn) error {
+	err = db.View(func(txn *badger.Txn) error {
 		stats, err := b.readEntityStats(txn, aggregate, entity)
 		if err != nil {
 			return err
@@ -181,26 +147,16 @@ func (b *BadgerEventStore) Read(aggregate string, entity string, factId string, 
 
 		records.Total = stats.Total
 
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 10
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		// Walk all the events using the aggregate as a prefix
-		for it.Seek(factKey); len(records.List) < records.PageSize && it.ValidForPrefix(aggKey); it.Next() {
-			item := it.Item()
-
-			record, err := decodeFact(item)
-			if err != nil {
-				return err
-			}
-
-			if record.Id.String() > factId {
-				records.List = append(records.List, *record)
-			}
+		list, err := b.readRecords(txn, aggregate, entity, factId, records.PageSize)
+		if err != nil {
+			return err
 		}
+
+		records.List = list
 		return nil
-	}); err != nil {
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -222,7 +178,7 @@ func (b *BadgerEventStore) Tail(aggregate string, entity string) (*Tail, error) 
 
 		tail.Total = stats.Total
 
-		evtKey := b.factKey(aggregate, entity, stats.LastId)
+		evtKey := b.factKey(aggregate, entity, stats.LastId.String())
 		item, err := txn.Get(evtKey)
 		if err != nil {
 			return err
@@ -236,6 +192,7 @@ func (b *BadgerEventStore) Tail(aggregate string, entity string) (*Tail, error) 
 		tail.Fact = *record
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +210,7 @@ func (b *BadgerEventStore) Scan(aggregate string) (*EntityList, error) {
 
 	prefix := []byte(aggregate)
 
-	if err = db.View(func(txn *badger.Txn) error {
+	err = db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false
 		opts.Prefix = prefix
@@ -281,7 +238,9 @@ func (b *BadgerEventStore) Scan(aggregate string) (*EntityList, error) {
 		}
 
 		return nil
-	}); err != nil {
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -327,8 +286,69 @@ func (b *BadgerEventStore) aggregateKey(aggregate string, entity string) []byte 
 	return []byte(strings.Join([]string{aggregate, entity}, separator))
 }
 
-func (b *BadgerEventStore) factKey(aggregate string, entity string, factId ulid.ULID) []byte {
-	return []byte(strings.Join([]string{aggregate, entity, factId.String()}, separator))
+func (b *BadgerEventStore) factKey(aggregate string, entity string, factId string) []byte {
+	return []byte(strings.Join([]string{aggregate, entity, factId}, separator))
+}
+
+func (b *BadgerEventStore) readRecords(txn *badger.Txn, aggregate string, entity string, minFactId string, pageSize int) ([]Fact, error) {
+	var records []Fact
+	opts := badger.DefaultIteratorOptions
+	opts.PrefetchSize = 10
+	it := txn.NewIterator(opts)
+	defer it.Close()
+
+	aggKey := b.aggregateKey(aggregate, entity)
+	startKey := b.factKey(aggregate, entity, minFactId)
+
+	// Walk all the events using the aggregate as a prefix
+	for it.Seek(startKey); len(records) < pageSize && it.ValidForPrefix(aggKey); it.Next() {
+		item := it.Item()
+
+		record, err := decodeFact(item)
+		if err != nil {
+			return records, err
+		}
+
+		// Ensure that "read from" is reading values after the start value
+		if record.Id.String() > minFactId {
+			records = append(records, *record)
+		}
+	}
+
+	return records, nil
+}
+
+func (b *BadgerEventStore) readEntityStats(txn *badger.Txn, aggregate string, entity string) (*AggregateStats, error) {
+	stats := AggregateStats{}
+	aggKey := b.aggregateKey(aggregate, entity)
+
+	item, err := txn.Get(aggKey)
+	if err == nil {
+		// If there is an error then this is a virgin aggregate so there is nothing to read
+		err = item.Value(func(val []byte) error {
+			dec := gob.NewDecoder(bytes.NewBuffer(val))
+			return dec.Decode(&stats)
+		})
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &stats, nil
+}
+
+func (b *BadgerEventStore) updateEntityStats(txn *badger.Txn, aggregate string, entity string, stats *AggregateStats) error {
+	aggKey := b.aggregateKey(aggregate, entity)
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(stats)
+	if err != nil {
+		return err
+	}
+
+	return txn.Set(aggKey, buf.Bytes())
 }
 
 func encodeFact(fact Fact) ([]byte, error) {
