@@ -196,8 +196,6 @@ func TestBadgerEventStore_ReadFrom(t *testing.T) {
 		return
 	}
 
-	lastEvt = results.List[len(results.List)-1].Id.String()
-
 	if results.Total != 10 {
 		t.Errorf("expected %d grand total events in the store, but there are only %d", 10, results.Total)
 	}
@@ -205,6 +203,8 @@ func TestBadgerEventStore_ReadFrom(t *testing.T) {
 	if len(results.List) != 5 {
 		t.Errorf("expected %d results returned in this request, received %d", 5, len(results.List))
 	}
+
+	lastEvt = results.List[len(results.List)-1].Id.String()
 
 	if tail.Fact.Id.String() != lastEvt {
 		t.Errorf("after reading from the event, expected to be caught up.  Tail %s, Last Event %s", tail.Fact.Id, lastEvt)
