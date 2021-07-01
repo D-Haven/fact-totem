@@ -55,49 +55,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	health := healthcheck.NewHandler()
-	health.AddLivenessCheck("go-routinethreshold", healthcheck.GoroutineCountCheck(100))
-
-	multiplexHandler := http.NewServeMux()
-	multiplexHandler.Handle("/ready", health)
-	multiplexHandler.Handle("/live", health)
-
-	projectApi, err := webapi.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
+	server, err := configureServer(config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() {
-		err := projectApi.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	users, err := LoadUserRepo(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	validator, err := config.Token.Validator()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	authHandler := webapi.AuthHandler{
-		Validator: validator,
-		Handler:   projectApi.Handle,
-		UserRepo:  users,
-	}
-
-	multiplexHandler.Handle("/", &authHandler)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-
-	server := &http.Server{
-		Addr:    config.Server.Host + ":" + config.Server.Port,
-		Handler: multiplexHandler,
-	}
 
 	go func() {
 		useTLS := len(config.Server.TLS.CertFile) != 0 && len(config.Server.TLS.KeyFile) != 0
@@ -131,4 +95,50 @@ func main() {
 	}
 
 	log.Print("...Shutdown complete")
+}
+
+func configureServer(config *Config) (*http.Server, error) {
+	health := healthcheck.NewHandler()
+	health.AddLivenessCheck("go-routinethreshold", healthcheck.GoroutineCountCheck(100))
+
+	multiplexHandler := http.NewServeMux()
+	multiplexHandler.Handle("/ready", health)
+	multiplexHandler.Handle("/live", health)
+
+	projectApi, err := webapi.NewApi(config.EventStore.Path, config.EventStore.EncryptionKey, config.EventStore.KeyDuration)
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := LoadUserRepo(config)
+	if err != nil {
+		return nil, err
+	}
+
+	validator, err := config.Token.Validator()
+	if err != nil {
+		return nil, err
+	}
+
+	authHandler := webapi.AuthHandler{
+		Validator: validator,
+		Handler:   projectApi.Handle,
+		UserRepo:  users,
+	}
+
+	multiplexHandler.Handle("/", &authHandler)
+
+	server := &http.Server{
+		Addr:    config.Server.Host + ":" + config.Server.Port,
+		Handler: multiplexHandler,
+	}
+
+	server.RegisterOnShutdown(func() {
+		err := projectApi.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+
+	return server, nil
 }
