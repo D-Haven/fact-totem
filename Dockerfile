@@ -1,4 +1,4 @@
-FROM goboring/golang:1.16.5b7 AS builder
+FROM goboring/golang:1.16.6b7 AS builder
 
 WORKDIR /go/src/github.com/D-Haven/fact-totem/
 COPY . .
