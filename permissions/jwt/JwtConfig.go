@@ -37,6 +37,8 @@ type JwtConfig struct {
 	Audience string `yaml:"audience,omitempty"`
 	// AcceptableSkew is the amount of time difference acceptable when testing times
 	AcceptableSkew time.Duration `yaml:"acceptableSkew,omitempty"`
+	// Maximum duration between the jwt issue time and expiration time, implicitly requires both values
+	MaxValidWindow time.Duration `yaml:"maxValidWindow,omitempty"`
 	jwtKey         []byte        `yaml:"-"`
 }
 
@@ -100,6 +102,12 @@ func (c *JwtConfig) ValidToken(token string) (jwt.Token, error) {
 
 	if c.AcceptableSkew.Nanoseconds() > 0 {
 		valOpt = append(valOpt, jwt.WithAcceptableSkew(c.AcceptableSkew))
+	}
+
+	if c.MaxValidWindow.Nanoseconds() > 0 {
+		valOpt = append(valOpt, jwt.WithRequiredClaim(jwt.IssuedAtKey))
+		valOpt = append(valOpt, jwt.WithRequiredClaim(jwt.ExpirationKey))
+		valOpt = append(valOpt, jwt.WithMaxDelta(c.MaxValidWindow, jwt.ExpirationKey, jwt.IssuedAtKey))
 	}
 
 	return jot, jwt.Validate(jot, valOpt...)
