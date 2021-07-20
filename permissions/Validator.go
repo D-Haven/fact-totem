@@ -17,20 +17,8 @@
 
 package permissions
 
-type NotAuthorized struct {
-	Cause error
-}
+import "github.com/lestrrat-go/jwx/jwt"
 
-func (n NotAuthorized) Error() string {
-	if n.Cause == nil {
-		return "user is not authorized"
-	}
-
-	return n.Cause.Error()
-}
-
-type Error string
-
-func (err Error) Error() string {
-	return string(err)
+type Validator interface {
+	ValidToken(token string) (jwt.Token, error)
 }

@@ -18,25 +18,32 @@
 package permissions
 
 import (
-	"strings"
+	"github.com/lestrrat-go/jwx/jwt"
 	"testing"
 )
 
 func TestRepositoryLoadPermissions(t *testing.T) {
-	repo := Repository{}
+	repo := Repository{
+		Users: []User{
+			{
+				Subject: "system:serviceaccount:cibob-dev:vault",
+				Read:    []string{"project", "repository"},
+				Append:  []string{"project"},
+			},
+		},
+	}
 
-	const userStream = `
-    - subject: system:serviceaccount:cibob-dev:vault
-      read: [project,repository]
-      append: [project]
-      scan: []`
-
-	err := repo.LoadPermissions(strings.NewReader(userStream))
+	token := jwt.New()
+	err := token.Set(jwt.SubjectKey, "system:serviceaccount:cibob-dev:vault")
 	if err != nil {
 		t.Error(err)
 	}
 
-	u := repo.FindUser("system:serviceaccount:cibob-dev:vault")
+	u := repo.FindUser(token)
+	if err != nil {
+		t.Error(err)
+	}
+
 	if u.CheckPermission(Append, "project") != nil {
 		t.Error("Expected to be able to append to the project aggregate")
 	}
@@ -49,20 +56,24 @@ func TestRepositoryLoadPermissions(t *testing.T) {
 }
 
 func TestRepositoryLoadPermissionsWideOpen(t *testing.T) {
-	repo := Repository{}
+	repo := Repository{
+		Users: []User{
+			{
+				Subject: "*",
+				Read:    []string{"*"},
+				Append:  []string{"*"},
+				Scan:    []string{"*"},
+			},
+		},
+	}
 
-	const userStream = `
-    - subject: "*"
-      read: ["*"]
-      append: ["*"]
-      scan: ["*"]`
-
-	err := repo.LoadPermissions(strings.NewReader(userStream))
+	token := jwt.New()
+	err := token.Set(jwt.SubjectKey, "system:serviceaccount:cibob-dev:cmbob")
 	if err != nil {
 		t.Error(err)
 	}
 
-	u := repo.FindUser("system:serviceaccount:cibob-dev:cmbob")
+	u := repo.FindUser(token)
 
 	if u.CheckPermission(Append, "project") != nil {
 		t.Error("Expected to be able to append to the project aggregate")

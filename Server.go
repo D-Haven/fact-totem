@@ -110,20 +110,9 @@ func configureServer(config *Config) (*http.Server, error) {
 		return nil, err
 	}
 
-	users, err := LoadUserRepo(config)
-	if err != nil {
-		return nil, err
-	}
-
-	validator, err := config.Token.Validator()
-	if err != nil {
-		return nil, err
-	}
-
 	authHandler := webapi.AuthHandler{
-		Validator: validator,
-		Handler:   projectApi.Handle,
-		UserRepo:  users,
+		Handler:    projectApi.Handle,
+		UserConfig: config.Permissions,
 	}
 
 	multiplexHandler.Handle("/", &authHandler)

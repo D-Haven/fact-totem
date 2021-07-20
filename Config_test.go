@@ -46,8 +46,9 @@ func TestMain(m *testing.M) {
 
 func TestReadValidConfigFromYaml(t *testing.T) {
 	content := `
-token:
-  keyPath: ./jwt.key
+permissions:
+  jwt:
+    keyPath: ./jwt.key
 server:
   port: 8443
   tls:
@@ -66,7 +67,7 @@ server:
 	}
 
 	Check(t, "server:port", "8443", config.Server.Port)
-	Check(t, "token:keyPath:", "./jwt.key", config.Token.KeyPath)
+	Check(t, "token:keyPath:", "./jwt.key", config.Permissions.Jwt.KeyPath)
 	Check(t, "server:tls:certificate", "/.cert/tls.crt", config.Server.TLS.CertFile)
 	Check(t, "server:tls:key", "/.cert/tls.key", config.Server.TLS.KeyFile)
 }
@@ -78,7 +79,7 @@ func TestReadInvalidConfigFromYaml(t *testing.T) {
 
 	config, err := ReadConfig(reader)
 	if config != nil {
-		t.Fatalf("An invalid config object was returned: %s", config)
+		t.Fatalf("An invalid config object was returned: %v", config)
 	}
 
 	if err == nil {
@@ -167,7 +168,7 @@ func TestGetValidatedConfigFailure(t *testing.T) {
 		t.Fatal("No error was specified, but config was empty")
 	}
 
-	Check(t, "JwtKeyPath", "./jwt.key", config.Token.KeyPath)
+	Check(t, "JwtKeyPath", "./jwt.key", config.Permissions.Jwt.KeyPath)
 	Check(t, "Server:Port", "8080", config.Server.Port)
 	Check(t, "Server:TLS:KeyFile", "", config.Server.TLS.KeyFile)
 	Check(t, "Server:TLS:CertFile", "", config.Server.TLS.CertFile)

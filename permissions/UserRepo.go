@@ -18,34 +18,21 @@
 package permissions
 
 import (
-	"gopkg.in/yaml.v3"
-	"io"
+	"github.com/lestrrat-go/jwx/jwt"
 )
-
-type UserRepo interface {
-	FindUser(subject string) *User
-}
 
 type Repository struct {
 	Users []User
 }
 
-func (r *Repository) FindUser(subject string) *User {
+func (r *Repository) FindUser(token jwt.Token) *User {
 	for _, u := range r.Users {
-		if u.Subject == subject || u.Subject == Wildcard {
+		if u.Subject == token.Subject() || u.Subject == Wildcard {
 			userCopy := u
-			userCopy.Subject = subject
+			userCopy.Subject = token.Subject()
 			return &userCopy
 		}
 	}
 
-	// Empty permission set for this user
-	return &User{
-		Subject: subject,
-	}
-}
-
-func (r *Repository) LoadPermissions(config io.Reader) error {
-	decoder := yaml.NewDecoder(config)
-	return decoder.Decode(&r.Users)
+	return nil
 }

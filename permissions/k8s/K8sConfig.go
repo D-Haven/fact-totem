@@ -15,22 +15,37 @@
  *
  */
 
-package permissions
+package k8s
 
-type NotAuthorized struct {
-	Cause error
+import (
+	"fmt"
+	"github.com/lestrrat-go/jwx/jwt"
+	"strings"
+)
+
+type K8sConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	client  Client `yaml:"-"`
 }
 
-func (n NotAuthorized) Error() string {
-	if n.Cause == nil {
-		return "user is not authorized"
+func (v *K8sConfig) ValidToken(token string) (jwt.Token, error) {
+	if strings.HasPrefix(token, "Bearer ") {
+		token = strings.TrimPrefix(token, "Bearer ")
 	}
 
-	return n.Cause.Error()
-}
+	jot, err := jwt.Parse([]byte(token))
+	if err != nil {
+		return nil, err
+	}
 
-type Error string
+	tr, err := v.client.ValidateToken(token)
+	if err != nil {
+		return nil, err
+	}
 
-func (err Error) Error() string {
-	return string(err)
+	if !tr.Status.Authenticated {
+		return nil, fmt.Errorf("k8s service account '%s' is not authenticated", jot.Subject())
+	}
+
+	return jot, nil
 }

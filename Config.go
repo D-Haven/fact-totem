@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"github.com/D-Haven/fact-totem/permissions"
-	"github.com/D-Haven/fact-totem/webapi"
 	"gopkg.in/yaml.v3"
 	"io"
 	"log"
@@ -29,8 +28,6 @@ import (
 )
 
 type Config struct {
-	// User Permissions path
-	PermissionsPath string `yaml:"permissions-path"`
 	// EventStore Badger DB settings
 	EventStore struct {
 		// Path to the database files
@@ -42,7 +39,7 @@ type Config struct {
 		KeyDuration time.Duration `yaml:"key-duration"`
 	} `yaml:"event-store"`
 	// Token configuration for JWT validation
-	Token webapi.JwtConfig `yaml:"token"`
+	Permissions permissions.Config `yaml:"permissions"`
 	// Server settings
 	Server struct {
 		// Host is the server host name
@@ -76,9 +73,8 @@ func GetValidatedConfig(configPath string) (*Config, error) {
 		log.Printf("Reverting to defaults... error with config file: %s", err)
 		config = &Config{}
 
+		config.Permissions.Jwt.KeyPath = "./jwt.key"
 		config.Server.Port = "8080"
-		config.Token.KeyPath = "./jwt.key"
-		config.PermissionsPath = "./permissions.yaml"
 		config.EventStore.Path = path.Join(".", "tmp", appName)
 		config.EventStore.KeyDuration = time.Hour * 24 * 10
 	}
@@ -142,24 +138,4 @@ func ValidateOptionalFile(path string) error {
 	}
 
 	return nil
-}
-
-func LoadUserRepo(config *Config) (permissions.UserRepo, error) {
-	repo := permissions.Repository{}
-	file, err := os.Open(config.PermissionsPath)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	err = repo.LoadPermissions(file)
-	if err != nil {
-		return nil, err
-	}
-
-	return &repo, nil
 }

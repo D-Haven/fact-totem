@@ -15,21 +15,16 @@
  *
  */
 
-package webapi
+package jwt
 
 import (
 	"crypto/rand"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
-	"net/http"
 	"os"
+	"strings"
 	"time"
 )
-
-type Validator interface {
-	RetrieveToken(r *http.Request) (jwt.Token, error)
-	IsValid(token jwt.Token) error
-}
 
 type JwtConfig struct {
 	// SignatureType is the signature type we are expecting
@@ -42,15 +37,12 @@ type JwtConfig struct {
 	Audience string `yaml:"audience,omitempty"`
 	// AcceptableSkew is the amount of time difference acceptable when testing times
 	AcceptableSkew time.Duration `yaml:"acceptableSkew,omitempty"`
+	jwtKey         []byte        `yaml:"-"`
 }
 
-func (c *JwtConfig) Validator() (Validator, error) {
-	v := jwtValidator{
-		config: *c,
-	}
-
+func (c *JwtConfig) loadKey() error {
 	if len(c.SignatureType) == 0 || len(c.KeyPath) == 0 {
-		return &v, nil
+		return nil
 	}
 
 	content, err := os.ReadFile(c.KeyPath)
@@ -58,53 +50,57 @@ func (c *JwtConfig) Validator() (Validator, error) {
 		content = make([]byte, 4096)
 		_, err := rand.Read(content)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		err = os.WriteFile(c.KeyPath, content, 0640)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	} else if err != nil {
+		return err
+	}
+
+	c.jwtKey = content
+
+	return nil
+}
+
+func (c *JwtConfig) ValidToken(token string) (jwt.Token, error) {
+	if (len(c.SignatureType) > 0 || len(c.KeyPath) > 0) && len(c.jwtKey) == 0 {
+		err := c.loadKey()
+		if err != nil {
+			return nil, err
+		}
+	}
+	var parsOpt []jwt.ParseOption
+
+	if len(c.SignatureType) != 0 {
+		parsOpt = append(parsOpt, jwt.WithVerify(c.SignatureType, c.jwtKey))
+	}
+
+	if strings.HasPrefix(token, "Bearer ") {
+		token = strings.TrimPrefix(token, "Bearer ")
+	}
+
+	jot, err := jwt.Parse([]byte(token), parsOpt...)
+	if err != nil {
 		return nil, err
 	}
 
-	v.jwtKey = content
+	var valOpt []jwt.ValidateOption
 
-	return &v, nil
-}
-
-type jwtValidator struct {
-	// config the parent configuration
-	config JwtConfig
-	// jwtKey is the key content in bytes
-	jwtKey []byte
-}
-
-func (v *jwtValidator) RetrieveToken(r *http.Request) (jwt.Token, error) {
-	var options []jwt.ParseOption
-
-	if len(v.config.SignatureType) != 0 {
-		options = append(options, jwt.WithVerify(v.config.SignatureType, v.jwtKey))
+	if len(c.Issuer) != 0 {
+		valOpt = append(valOpt, jwt.WithIssuer(c.Issuer))
 	}
 
-	return jwt.ParseRequest(r, options...)
-}
-
-func (v *jwtValidator) IsValid(token jwt.Token) error {
-	var options []jwt.ValidateOption
-
-	if len(v.config.Issuer) != 0 {
-		options = append(options, jwt.WithIssuer(v.config.Issuer))
+	if len(c.Audience) != 0 {
+		valOpt = append(valOpt, jwt.WithAudience(c.Audience))
 	}
 
-	if len(v.config.Audience) != 0 {
-		options = append(options, jwt.WithAudience(v.config.Audience))
+	if c.AcceptableSkew.Nanoseconds() > 0 {
+		valOpt = append(valOpt, jwt.WithAcceptableSkew(c.AcceptableSkew))
 	}
 
-	if v.config.AcceptableSkew.Nanoseconds() > 0 {
-		options = append(options, jwt.WithAcceptableSkew(v.config.AcceptableSkew))
-	}
-
-	return jwt.Validate(token, options...)
+	return jot, jwt.Validate(jot, valOpt...)
 }

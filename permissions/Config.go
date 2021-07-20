@@ -17,20 +17,21 @@
 
 package permissions
 
-type NotAuthorized struct {
-	Cause error
+import (
+	"github.com/D-Haven/fact-totem/permissions/jwt"
+	"github.com/D-Haven/fact-totem/permissions/k8s"
+)
+
+type Config struct {
+	K8s         k8s.K8sConfig `yaml:"k8s,omitempty"`
+	Jwt         jwt.JwtConfig `yaml:"jwt,omitempty"`
+	Permissions Repository    `yaml:"permissions,omitempty"`
 }
 
-func (n NotAuthorized) Error() string {
-	if n.Cause == nil {
-		return "user is not authorized"
+func (c *Config) Validator() Validator {
+	if c.K8s.Enabled {
+		return &c.K8s
 	}
 
-	return n.Cause.Error()
-}
-
-type Error string
-
-func (err Error) Error() string {
-	return string(err)
+	return &c.Jwt
 }

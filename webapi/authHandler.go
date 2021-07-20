@@ -18,31 +18,26 @@ package webapi
 
 import (
 	"github.com/D-Haven/fact-totem/permissions"
-	"github.com/lestrrat-go/jwx/jwt"
 	"net/http"
 )
 
 type AuthenticatedHandler func(w http.ResponseWriter, r *http.Request, user *permissions.User)
 
 type AuthHandler struct {
-	UserRepo  permissions.UserRepo
-	Validator Validator
-	Handler   AuthenticatedHandler
+	UserConfig permissions.Config
+	Handler    AuthenticatedHandler
 }
 
 func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	token, _ := jwt.ParseRequest(r)
-	var user *permissions.User
+	validator := h.UserConfig.Validator()
 
-	if token != nil {
-		err := h.Validator.IsValid(token)
-		if err != nil {
-			createError(permissions.NotAuthorized{Cause: err}).write(w)
-			return
-		}
-
-		user = h.UserRepo.FindUser(token.Subject())
+	token, err := validator.ValidToken(r.Header.Get("Authorization"))
+	if err != nil {
+		createError(permissions.NotAuthorized{Cause: err}).write(w)
+		return
 	}
+
+	user := h.UserConfig.Permissions.FindUser(token)
 
 	h.Handler(w, r, user)
 }
