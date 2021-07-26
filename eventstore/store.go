@@ -17,6 +17,17 @@
 // Package eventstore handles the low level badger interactions.
 package eventstore
 
+import (
+	"github.com/oklog/ulid/v2"
+	"time"
+)
+
+type Fact struct {
+	Id        ulid.ULID
+	Timestamp time.Time
+	Content   interface{}
+}
+
 type Tail struct {
 	Fact  Fact
 	Total uint

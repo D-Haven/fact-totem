@@ -39,12 +39,6 @@ type BadgerEventStore struct {
 	generator                  IdGenerator
 }
 
-type Fact struct {
-	Id        ulid.ULID
-	Timestamp time.Time
-	Content   interface{}
-}
-
 type AggregateStats struct {
 	LastId ulid.ULID
 	Total  uint

@@ -10,6 +10,5 @@ require (
 	github.com/oklog/ulid/v2 v2.0.2
 	github.com/prometheus/client_golang v1.11.0 // indirect
 	golang.org/x/net v0.0.0-20210716203947-853a461950ff
-	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
