@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"github.com/D-Haven/fact-totem/eventstore"
 	"github.com/D-Haven/fact-totem/permissions"
+	"io/ioutil"
 	"net/http"
-	"os"
 	"regexp"
 	"time"
 )
@@ -41,7 +41,7 @@ func NewApi(path string, keyfile string, keyDuration time.Duration) (*FactApi, e
 	api := FactApi{}
 
 	if len(keyfile) > 0 {
-		key, err := os.ReadFile(keyfile)
+		key, err := ioutil.ReadFile(keyfile)
 		if err != nil {
 			return nil, err
 		}

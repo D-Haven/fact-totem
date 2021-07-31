@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -47,7 +48,7 @@ func (c *JwtConfig) loadKey() error {
 		return nil
 	}
 
-	content, err := os.ReadFile(c.KeyPath)
+	content, err := ioutil.ReadFile(c.KeyPath)
 	if os.IsNotExist(err) {
 		content = make([]byte, 4096)
 		_, err := rand.Read(content)
@@ -55,7 +56,7 @@ func (c *JwtConfig) loadKey() error {
 			return err
 		}
 
-		err = os.WriteFile(c.KeyPath, content, 0640)
+		err = ioutil.WriteFile(c.KeyPath, content, 0640)
 		if err != nil {
 			return err
 		}
