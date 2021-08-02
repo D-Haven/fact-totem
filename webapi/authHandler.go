@@ -37,7 +37,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := h.UserConfig.Permissions.FindUser(token)
+	user := h.UserConfig.Repository.FindUser(token)
 
 	h.Handler(w, r, user)
 }

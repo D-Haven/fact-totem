@@ -21,13 +21,14 @@ import (
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwt"
 	"testing"
+	"time"
 )
 
-func TestJwtConfig_ValidTokenWithAudience(t *testing.T) {
+func TestJwtConfigValidTokenWithAudience(t *testing.T) {
 	config := JwtConfig{
 		SignatureType: jwa.HS512,
 		Audience:      "mytest",
-		KeyPath:       "./jwt.key",
+		KeyPath:       "../jwt.key",
 	}
 	err := config.loadKey()
 	if err != nil {
@@ -65,5 +66,38 @@ func TestJwtConfig_ValidTokenWithAudience(t *testing.T) {
 	_, err = config.ValidToken(string(bb))
 	if err == nil {
 		t.Error("Expected error, but did not receive it.")
+	}
+}
+
+func TestJwtConfigValidTokenWithValidTimeSpan(t *testing.T) {
+	config := JwtConfig{
+		SignatureType:  jwa.HS512,
+		KeyPath:        "../jwt.key",
+		MaxValidWindow: 10 * time.Minute,
+		AcceptableSkew: 50 * time.Millisecond,
+	}
+	err := config.loadKey()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	good := jwt.New()
+	_ = good.Set(jwt.SubjectKey, "test")
+	_ = good.Set(jwt.IssuedAtKey, time.Now())
+	_ = good.Set(jwt.ExpirationKey, time.Now().Add(10*time.Minute))
+
+	gb, err := jwt.Sign(good, config.SignatureType, config.jwtKey)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	tok, err := config.ValidToken(string(gb))
+	if err != nil {
+		t.Error(err)
+	}
+	if tok.Subject() != good.Subject() {
+		t.Errorf("Good token mismatch on validation")
 	}
 }

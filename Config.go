@@ -67,6 +67,9 @@ func GetValidatedConfig(configPath string) (*Config, error) {
 		}()
 
 		config, err = ReadConfig(file)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err != nil || config == nil {
@@ -91,6 +94,7 @@ func ReadConfig(reader io.Reader) (*Config, error) {
 	config := &Config{}
 
 	d := yaml.NewDecoder(reader)
+	d.KnownFields(true)
 	if err := d.Decode(&config); err != nil {
 		return nil, err
 	}

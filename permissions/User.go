@@ -27,10 +27,10 @@ const (
 )
 
 type User struct {
-	Subject string
-	Read    []string
-	Append  []string
-	Scan    []string
+	Subject string   `yaml:"subject"`
+	Read    []string `yaml:"read"`
+	Append  []string `yaml:"append"`
+	Scan    []string `yaml:"scan"`
 }
 
 func (u User) CheckPermission(permission string, aggregate string) error {

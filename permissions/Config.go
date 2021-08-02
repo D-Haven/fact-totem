@@ -23,9 +23,9 @@ import (
 )
 
 type Config struct {
-	K8s         k8s.K8sConfig `yaml:"k8s,omitempty"`
-	Jwt         jwt.JwtConfig `yaml:"jwt,omitempty"`
-	Permissions Repository    `yaml:"permissions,omitempty"`
+	K8s        k8s.K8sConfig `yaml:"k8s,omitempty"`
+	Jwt        jwt.JwtConfig `yaml:"jwt,omitempty"`
+	Repository Repository    `yaml:"repository,omitempty"`
 }
 
 func (c *Config) Validator() Validator {

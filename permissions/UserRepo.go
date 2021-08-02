@@ -22,7 +22,7 @@ import (
 )
 
 type Repository struct {
-	Users []User
+	Users []User `yaml:"users"`
 }
 
 func (r *Repository) FindUser(token jwt.Token) *User {
