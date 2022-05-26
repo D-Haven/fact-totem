@@ -20,3 +20,6 @@
 /jwt.key
 *.txt
 tmp/
+/permissions/jwt.key
+/tls.crt
+/tls.key
