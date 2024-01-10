@@ -19,17 +19,16 @@ package jwt
 
 import (
 	"crypto/rand"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
-	"io/ioutil"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"os"
 	"strings"
 	"time"
 )
 
 type JwtConfig struct {
-	// SignatureType is the signature type we are expecting
-	SignatureType jwa.SignatureAlgorithm `yaml:"SignatureType,omitempty"`
+	// KeyAlgorithm is the key algorithm we are expecting
+	KeyAlgorithm jwa.KeyAlgorithm `yaml:"KeyAlgorithm,omitempty"`
 	// KeyPath is the path to the key file(s) (if using JWS)
 	KeyPath string `yaml:"keyPath,omitempty"`
 	// Issuer is the authority that issued the JWT
@@ -44,11 +43,11 @@ type JwtConfig struct {
 }
 
 func (c *JwtConfig) loadKey() error {
-	if len(c.SignatureType) == 0 || len(c.KeyPath) == 0 {
+	if len(c.KeyAlgorithm.String()) == 0 || len(c.KeyPath) == 0 {
 		return nil
 	}
 
-	content, err := ioutil.ReadFile(c.KeyPath)
+	content, err := os.ReadFile(c.KeyPath)
 	if os.IsNotExist(err) {
 		content = make([]byte, 4096)
 		_, err := rand.Read(content)
@@ -56,7 +55,7 @@ func (c *JwtConfig) loadKey() error {
 			return err
 		}
 
-		err = ioutil.WriteFile(c.KeyPath, content, 0640)
+		err = os.WriteFile(c.KeyPath, content, 0640)
 		if err != nil {
 			return err
 		}
@@ -70,7 +69,7 @@ func (c *JwtConfig) loadKey() error {
 }
 
 func (c *JwtConfig) ValidToken(token string) (jwt.Token, error) {
-	if (len(c.SignatureType) > 0 || len(c.KeyPath) > 0) && len(c.jwtKey) == 0 {
+	if (len(c.KeyAlgorithm.String()) > 0 || len(c.KeyPath) > 0) && len(c.jwtKey) == 0 {
 		err := c.loadKey()
 		if err != nil {
 			return nil, err
@@ -78,8 +77,8 @@ func (c *JwtConfig) ValidToken(token string) (jwt.Token, error) {
 	}
 	var parsOpt []jwt.ParseOption
 
-	if len(c.SignatureType) != 0 {
-		parsOpt = append(parsOpt, jwt.WithVerify(c.SignatureType, c.jwtKey))
+	if len(c.KeyAlgorithm.String()) != 0 {
+		parsOpt = append(parsOpt, jwt.WithKey(c.KeyAlgorithm, c.jwtKey))
 	}
 
 	if strings.HasPrefix(token, "Bearer ") {

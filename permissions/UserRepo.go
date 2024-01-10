@@ -18,7 +18,7 @@
 package permissions
 
 import (
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 type Repository struct {

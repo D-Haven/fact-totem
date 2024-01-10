@@ -18,17 +18,17 @@
 package jwt
 
 import (
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"testing"
 	"time"
 )
 
 func TestJwtConfigValidTokenWithAudience(t *testing.T) {
 	config := JwtConfig{
-		SignatureType: jwa.HS512,
-		Audience:      "mytest",
-		KeyPath:       "../jwt.key",
+		KeyAlgorithm: jwa.HS512,
+		Audience:     "mytest",
+		KeyPath:      "../jwt.key",
 	}
 	err := config.loadKey()
 	if err != nil {
@@ -44,12 +44,12 @@ func TestJwtConfigValidTokenWithAudience(t *testing.T) {
 	_ = bad.Set(jwt.SubjectKey, "test")
 	_ = bad.Set(jwt.AudienceKey, "not right")
 
-	gb, err := jwt.Sign(good, config.SignatureType, config.jwtKey)
+	gb, err := jwt.Sign(good, jwt.WithKey(config.KeyAlgorithm, config.jwtKey))
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	bb, err := jwt.Sign(bad, config.SignatureType, config.jwtKey)
+	bb, err := jwt.Sign(bad, jwt.WithKey(config.KeyAlgorithm, config.jwtKey))
 	if err != nil {
 		t.Error(err)
 		return
@@ -71,7 +71,7 @@ func TestJwtConfigValidTokenWithAudience(t *testing.T) {
 
 func TestJwtConfigValidTokenWithValidTimeSpan(t *testing.T) {
 	config := JwtConfig{
-		SignatureType:  jwa.HS512,
+		KeyAlgorithm:   jwa.HS512,
 		KeyPath:        "../jwt.key",
 		MaxValidWindow: 10 * time.Minute,
 		AcceptableSkew: 50 * time.Millisecond,
@@ -87,7 +87,7 @@ func TestJwtConfigValidTokenWithValidTimeSpan(t *testing.T) {
 	_ = good.Set(jwt.IssuedAtKey, time.Now())
 	_ = good.Set(jwt.ExpirationKey, time.Now().Add(10*time.Minute))
 
-	gb, err := jwt.Sign(good, config.SignatureType, config.jwtKey)
+	gb, err := jwt.Sign(good, jwt.WithKey(config.KeyAlgorithm, config.jwtKey))
 	if err != nil {
 		t.Error(err)
 		return

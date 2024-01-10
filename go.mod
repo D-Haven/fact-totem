@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
 	github.com/dgraph-io/badger/v3 v3.2103.5
-	github.com/heptiolabs/healthcheck v0.0.0-20180807145615-6ff867650f40
-	github.com/lestrrat-go/jwx v1.2.26
+	github.com/heptiolabs/healthcheck v0.0.0-20211123025425-613501dd5deb
+	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/prometheus/client_golang v1.11.1 // indirect
 	golang.org/x/net v0.17.0

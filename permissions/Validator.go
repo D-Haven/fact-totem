@@ -17,7 +17,7 @@
 
 package permissions
 
-import "github.com/lestrrat-go/jwx/jwt"
+import "github.com/lestrrat-go/jwx/v2/jwt"
 
 type Validator interface {
 	ValidToken(token string) (jwt.Token, error)

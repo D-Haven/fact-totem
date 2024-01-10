@@ -19,7 +19,7 @@ package k8s
 
 import (
 	"fmt"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"strings"
 )
 
