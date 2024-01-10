@@ -9,7 +9,7 @@ require (
 	github.com/lestrrat-go/jwx v1.2.26
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/prometheus/client_golang v1.11.0 // indirect
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.17.0
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
